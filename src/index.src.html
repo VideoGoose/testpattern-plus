@@ -187,7 +187,13 @@
   var PY_SOURCE = /*@PYSRC@*/'';
   var VERSION = '@VERSION@';
   var REG_NAME = 'gus_tp';                // registered fresh each time the window opens
-  var AUTO_NAME = 'gus_testpattern';      // the same code, auto-loaded from this folder
+  // the plugin folder this window was served from: plugins/<FOLDER>/. The helper is told, so it
+  // finds presets / products / logos whatever the folder is called.
+  var FOLDER = (function () {
+    var m = /\/plugins\/([^\/]+)\//.exec(location.pathname);
+    try { return m ? decodeURIComponent(m[1]) : 'testpattern-plus'; } catch (e) { return 'testpattern-plus'; }
+  })();
+  var AUTO_NAME = FOLDER;                 // the same code, auto-loaded from this folder
   var $ = function (id) { return document.getElementById(id); };
   var SCHEMA = GusTP.SCHEMA, D = GusTP.defaults();
   var mod = REG_NAME, session = null, info = null;
@@ -923,14 +929,14 @@
     if (migrated) return Promise.resolve();
     migrated = true;
     var base = outBase(), todo = layers.filter(function (l) {
-      return l.url && /gus_testpattern\/out\.html/.test(l.url) && l.url.split('#')[0] !== base;
+      return l.url && l.url.indexOf('/' + FOLDER + '/out.html') >= 0 && l.url.split('#')[0] !== base;
     });
     if (!todo.length) { diag('✓ all Test Pattern+ layers already on ' + new URL(base).host); return Promise.resolve(); }
     return todo.reduce(function (p, l) {
       return p.then(function () {
         var url = base + (l.url.indexOf('#') >= 0 ? l.url.slice(l.url.indexOf('#')) : '');
         return call('set_url', l.name, url).then(function (r) {
-          diag((r.ok ? '✓ moved ' : '✗ could not move ') + l.name + ' → ' + new URL(base).host + (r.ok ? '' : ': ' + r.error));
+          diag((r.ok ? '✓ moved ' : '✗ could not move ') + l.name + ' → ' + base + (r.ok ? '' : ': ' + r.error));
           if (r.ok) l.url = url;
         });
       });
@@ -1059,7 +1065,7 @@
   };
 
   // ---- presets: one JSON file each in <plugin>/presets/ ------------------
-  // Copy a file into another project's plugins/gus_testpattern/presets/ to move it.
+  // Copy a file into another project's plugins/testpattern-plus/presets/ to move it.
   // Without a Designer connection they fall back to this window's own storage.
   var PRESET_SKIP = { labelText: 1, resW: 1, resH: 1 };      // per-layer, never in a preset
   function localPresets() { try { return JSON.parse(store.get('tp.presets') || '{}'); } catch (e) { return {}; } }
@@ -1152,7 +1158,7 @@
         lastPreset = r.file.replace(/\.json$/i, '');
         filePresets[lastPreset] = { file: r.file, settings: settings };
         fillPresets();
-        toast('Saved preset file:\n' + r.path + '\nCopy it to another project\'s gus_testpattern\\presets folder to use it there.', 7000);
+        toast('Saved preset file:\n' + r.path + '\nCopy it to another project\'s ' + FOLDER + '\\presets folder to use it there.', 7000);
       });
     }).catch(function (e) { toast('Preset not saved: ' + e.message, 6000); });
   };
@@ -1202,10 +1208,10 @@
           .catch(function (e) { diag('✗ register: ' + e.message + ' → trying auto-loaded ' + AUTO_NAME); mod = AUTO_NAME; });
       })
       .then(function () {
-        return call('info').catch(function (e) {
+        return call('info', FOLDER).catch(function (e) {
           diag('✗ info() via ' + mod + ': ' + e.message);
           if (mod === AUTO_NAME) throw e;
-          mod = AUTO_NAME; return call('info');
+          mod = AUTO_NAME; return call('info', FOLDER);
         });
       })
       .then(function (r) {

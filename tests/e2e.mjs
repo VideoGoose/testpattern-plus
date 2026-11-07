@@ -23,7 +23,7 @@ const errs = [];
 ui.on("pageerror", e => errs.push("ui: " + e.message));
 ui.on("dialog", d => { errs.push("browser dialog used: " + d.message()); d.dismiss(); });
 await ui.setViewportSize({ width: 1400, height: 860 });
-await ui.goto(base + "/plugins/gus_testpattern/index.html");
+await ui.goto(base + "/plugins/testpattern-plus/index.html");
 await ui.waitForFunction(() => /connected|driving|LIVE/.test(document.getElementById("statusTxt").textContent), null, { timeout: 8000 });
 
 // screens -> sets size + label
@@ -89,11 +89,14 @@ res.logoPx = await outp.evaluate(() => Array.from(document.getElementById("c").g
 const ui2 = await ctx.newPage();
 ui2.on("pageerror", e => errs.push("ui2: " + e.message));
 await ui2.evaluate(() => { try { localStorage.clear(); } catch (e) {} }).catch(() => {});
-await ui2.goto(base + "/plugins/gus_testpattern/index.html");
+await ui2.goto(base + "/plugins/testpattern-plus/index.html");
 await ui2.waitForFunction(() => document.getElementById("target").options.length > 1, null, { timeout: 8000 });
 await pick(ui2, "#target", "TP LED_A");
 await ui2.waitForTimeout(200);
 res.restored = await ui2.inputValue('.row[data-key="gridThickness"] input[type=number]');
+w = await world();
+res.layerUrl = w[0].url;
+res.pluginDir = await ui2.evaluate(() => document.getElementById("diagLog").textContent.split(String.fromCharCode(10)).filter(l => /presets in|LED products/.test(l)));
 await ui2.close();
 
 // exports

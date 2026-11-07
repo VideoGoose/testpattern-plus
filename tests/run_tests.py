@@ -50,8 +50,8 @@ def main():
     failed = []
     for i, test in enumerate(TESTS):
         proj = tempfile.mkdtemp(prefix='tp_proj_')
-        plug = os.path.join(proj, 'plugins', 'gus_testpattern')
-        shutil.copytree(os.path.join(ROOT, 'dist', 'gus_testpattern'), plug)
+        plug = os.path.join(proj, 'plugins', 'testpattern-plus')
+        shutil.copytree(os.path.join(ROOT, 'dist', 'testpattern-plus'), plug)
         red_png(os.path.join(plug, 'logos', 'red.png'))
         # a user's own product list, the way Excel saves it (BOM, CRLF): one new product and
         # one override of a built-in (same name, different notes)

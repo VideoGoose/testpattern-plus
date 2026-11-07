@@ -9,6 +9,13 @@ is git-ignored. Keep names, user paths and e-mail addresses out of tracked files
 
 ## Working rules
 
+- **Backwards compatibility from 0.9.21 on.** 0.9.21 (first public release, folder renamed to
+  `testpattern-plus`) deliberately dropped compatibility with earlier builds, once. Every release
+  after it must keep working with what earlier releases saved: Web layer URLs (`#key=value` hash),
+  preset files, `my_led_products.csv`, the plugin folder name. So: never rename or remove a SCHEMA
+  key, never reorder or reuse enum indexes (append new options), keep defaults stable (changing one
+  silently changes old layers, since URLs only store non-default values), keep CSV columns and the
+  preset JSON shape readable. When something must change, read the old form and migrate it.
 - **Bump `VERSION` in `build.py` on every change you install, and tell the user the version number.**
   Scheme is `0.9.xx`: raise the last number by one each time (0.9.13 → 0.9.14).
   It shows as a badge in the plugin window, in the Plugin Launcher name, in `VERSION.txt` and in
@@ -18,7 +25,7 @@ is git-ignored. Keep names, user paths and e-mail addresses out of tracked files
   `CLAUDE.local.md`). Copies the plugin files in `FILES` (incl. `led_products.csv`, `README.txt`),
   byte-checks them, leaves `logos/`, `presets/` and `my_led_products.csv` alone. The user must
   **close and reopen the plugin window** from Plugins → Plugin Launcher to load a new version.
-- Release: `python build.py --zip` → `dist/testpattern-plus-<v>.zip` (the `gus_testpattern` folder at the top; that folder name must not change) +
+- Release: `python build.py --zip` → `dist/testpattern-plus-<v>.zip` (the `testpattern-plus` folder at the top) +
   `dist/RELEASE_NOTES.md`. Pushing a tag `v<VERSION>` runs `.github/workflows/release.yml`, which
   checks the tag against `build.py`, builds the zip and publishes a GitHub Release (pre-release
   while the version is 0.x).
@@ -51,7 +58,13 @@ line plus drawing code in `render()`.
 
 ## How it talks to Designer
 
-- Window served by Designer at `/projects/<project>/plugins/gus_testpattern/?director=host:port`.
+- Window served by Designer at `/projects/<project>/plugins/testpattern-plus/?director=host:port`.
+  Nothing may hard-code the folder name: the window reads it from `location.pathname` and passes
+  it to `info(folder)`; `_plugin_dir()` imports the auto-loaded copy under any likely module name
+  (folder, underscore spelling, `user_module_` prefix) and prefers the sibling folder the window
+  came from. No compatibility with the pre-0.9.21 `gus_testpattern` folder: a one-off for the first
+  release (see Working rules for compatibility from 0.9.21 on).
+  Unverified in Designer: whether its auto-loader accepts a hyphen in the folder name.
   API discovery: `?director` → last good address → same origin → ports 80/81/8080.
 - `POST /api/session/python/registermodule {moduleName, contents}` registers `designer.py` as
   `gus_tp`; `POST /api/session/python/execute {moduleName, script}` calls it. `returnValue` comes
@@ -161,7 +174,7 @@ dropdowns · 2.9 separate host for Web layers · 2.10 migrate old layers (window
 2.13.0 LED modules, led_products.csv, preset files.
 
 Renumbered on 2026-11-07: 2.13.0 became **0.9.13** (same code); the patch number carries on
-(0.9.14, 0.9.15 …). 0.9.14 Projector grid / LED wall mode toggle. 0.9.15 Gradient mode + 16-bit export, window layout fix. 0.9.16 no input transform in Gradient mode. 0.9.17 no grid/circles in Gradient mode. 0.9.18 LED tile colour modes, no grid/circles in LED mode. 0.9.19 searchable LED product picker. 0.9.20 release zip + workflow, my_led_products.csv. Older notes and code comments that mention 2.x refer to the old numbering.
+(0.9.14, 0.9.15 …). 0.9.14 Projector grid / LED wall mode toggle. 0.9.15 Gradient mode + 16-bit export, window layout fix. 0.9.16 no input transform in Gradient mode. 0.9.17 no grid/circles in Gradient mode. 0.9.18 LED tile colour modes, no grid/circles in LED mode. 0.9.19 searchable LED product picker. 0.9.20 release zip + workflow, my_led_products.csv. 0.9.21 plugin folder renamed gus_testpattern → testpattern-plus (no carry-over). Older notes and code comments that mention 2.x refer to the old numbering.
 
 ## Known limits
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Assemble dist/gus_testpattern/ -- the folder that goes in {project}/plugins/.
+"""Assemble dist/testpattern-plus/ -- the folder that goes in {project}/plugins/.
 
     python build.py                             # build only
     python build.py --install "<plugins dir>"   # build, copy into a Designer project's plugins
@@ -16,10 +16,10 @@ import zipfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.join(HERE, 'src')
-PLUGIN = 'gus_testpattern'      # folder name Designer loads; designer.py finds itself by it
-ZIP_NAME = 'testpattern-plus'   # release download: testpattern-plus-<version>.zip (folder inside stays PLUGIN)
+PLUGIN = 'testpattern-plus'     # plugins/<PLUGIN>/ ; the window tells the helper which folder it is in
+ZIP_NAME = PLUGIN               # release download: testpattern-plus-<version>.zip, PLUGIN folder inside
 OUT = os.path.join(HERE, 'dist', PLUGIN)
-VERSION = '0.9.20'   # 0.9.xx: bump the last number on every change you install
+VERSION = '0.9.21'   # 0.9.xx: bump the last number on every change you install
 # replaced on every install / update. The user's own files (logos/, presets/,
 # my_led_products.csv) are never part of a build, so an update can't overwrite them.
 FILES = ['index.html', 'out.html', '__init__.py', 'd3plugin.json', 'VERSION.txt', 'led_products.csv', 'README.txt']
@@ -29,8 +29,7 @@ PLUGIN_README = """Test Pattern+ v{v} for disguise Designer
 =======================================
 
 Install / update
-  1. Unzip so this folder sits at  <your Designer project>\\plugins\\gus_testpattern\\
-     (the folder must keep the name gus_testpattern).
+  1. Unzip so this folder sits at  <your Designer project>\\plugins\\testpattern-plus\\
   2. In Designer: Plugins > Plugin Launcher > Test Pattern+.
      After an update, close the plugin window and open it again.
   Updating replaces only the plugin's own files. Your logos, presets and
@@ -39,7 +38,7 @@ Install / update
 Your files in this folder
   logos\\                 PNG / JPEG / WebP / SVG images for the logo dropdowns
   presets\\               saved presets, one .json each. Copy a file into another
-                         project's gus_testpattern\\presets\\ folder to use it there.
+                         project's testpattern-plus\\presets\\ folder to use it there.
   led_products.csv       built-in LED product list (replaced by updates)
   my_led_products.csv    optional: your own products, same columns as
                          led_products.csv. Rows with the same manufacturer + product
@@ -79,7 +78,7 @@ def build():
         'logos/put-logo-images-here.txt': 'PNG, JPEG, WebP or SVG files in this folder show up in the Logos dropdowns.\n',
         'presets/put-preset-files-here.txt': (
             'Save preset in the plugin window writes <name>.json here.\n'
-            'Copy a .json file into another project\'s plugins/gus_testpattern/presets/ folder to use it there.\n'),
+            'Copy a .json file into another project\'s plugins/testpattern-plus/presets/ folder to use it there.\n'),
     }
     for name, text in files.items():
         # README is for Windows users opening it in Notepad: CRLF; everything else LF
@@ -109,7 +108,7 @@ def install(plugins_dir):
 
 
 def make_zip():
-    """dist/testpattern-plus-<v>.zip: the gus_testpattern folder itself at the top, ready to unzip into plugins/."""
+    """dist/testpattern-plus-<v>.zip: the testpattern-plus folder itself at the top, ready to unzip into plugins/."""
     path = os.path.join(HERE, 'dist', '%s-%s.zip' % (ZIP_NAME, VERSION))
     with zipfile.ZipFile(path, 'w', zipfile.ZIP_DEFLATED) as z:
         for root, dirs, names in os.walk(OUT):
@@ -124,7 +123,7 @@ def make_zip():
                 '1. Download **%s-%s.zip** from the assets below (not GitHub\'s "Source code" zips: those '
                 'are the project source, not the plugin).\n'
                 '2. Unzip it into your Designer project\'s `plugins` folder, so you get '
-                '`<project>\\plugins\\gus_testpattern\\`.\n'
+                '`<project>\\plugins\\testpattern-plus\\`.\n'
                 '3. In Designer open **Plugins → Plugin Launcher → Test Pattern+**. After an update, close the '
                 'plugin window and open it again.\n\n'
                 'Updating replaces only the plugin\'s own files: your `logos`, `presets` and '

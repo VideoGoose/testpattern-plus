@@ -2,7 +2,7 @@
 // node tests/e2e_led.mjs <port> <outdir>   (mock_designer.py must be running on <port>)
 import { chromium } from "playwright";
 const [port, out] = process.argv.slice(2);
-const base = `http://127.0.0.1:${port}/plugins/gus_testpattern/`;
+const base = `http://127.0.0.1:${port}/plugins/testpattern-plus/`;
 const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROMIUM_PATH || undefined });
 const ctx = await browser.newContext();
 const errs = [], res = {};

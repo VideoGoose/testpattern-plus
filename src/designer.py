@@ -6,7 +6,8 @@ No bridge: the plugin window (served by Designer from this folder) calls
 these through Designer's own /api/session/python/execute. Every call is one
 quick pass on the render thread. Every function returns a JSON string.
 
-    info()                         director/project/capabilities + web layers
+    info(folder)                   director/project/capabilities; folder = plugins/<folder>/ the
+                                   window was served from (the plugin folder's name can change)
     web_layers()                   Web layers on the current track, with URLs
     make_layer(name, url)          new Web layer at the playhead, URL set
     set_url(layer_name, url)       rewrite a Web layer's URL (live updates)
@@ -39,7 +40,8 @@ BOOKMARK_URL_ATTRS = ('url', 'URL', 'address', 'link', 'webUrl', 'homeUrl', 'hom
 LAYER_SECONDS = 30
 SIZE_MODE_FIELD = 'size_mode'
 SIZE_MODE_MATCH_MAPPING = 0      # Designer's list: 0 Match Mapping, 1 Custom (seen r32.4.18)
-PLUGIN_MODULE_NAMES = ('gus_testpattern', 'user_module_gus_testpattern')
+PLUGIN_FOLDER = 'testpattern-plus'      # plugins/<this>/
+_FOLDER = [PLUGIN_FOLDER]                # the folder the window was served from (info(folder))
 EXPORT_EXTS = ('.png', '.tif', '.tiff')
 IMAGE_EXTS = ('.png', '.jpg', '.jpeg', '.webp', '.svg')
 PRODUCTS_FILE = 'led_products.csv'          # shipped list, replaced by every update
@@ -778,20 +780,41 @@ def _screens_impl():
         return _fail(e, screens=[])
 
 
+def _module_names():
+    """Names Designer may have given the auto-loaded copy of this module: the folder name, an
+    underscore spelling (a hyphen isn't a valid Python name), with or without 'user_module_'."""
+    out = []
+    for f in (_FOLDER[0], PLUGIN_FOLDER):
+        for n in (f, f.replace('-', '_'), 'user_module_' + f, 'user_module_' + f.replace('-', '_')):
+            if n not in out:
+                out.append(n)
+    return out
+
+
 def _plugin_dir():
     os = _os()
     if os is None:
         return None
-    for mod in PLUGIN_MODULE_NAMES:
+    found = None
+    for mod in _module_names():
         try:
             m = __import__(mod)
             f = getattr(m, '__file__', None)
             if f:
-                return os.path.dirname(os.path.abspath(f))
+                found = os.path.dirname(os.path.abspath(f))
+                break
         except:  # noqa: E722
             continue
-    f = globals().get('__file__')
-    return os.path.dirname(os.path.abspath(f)) if f else None
+    if found is None:
+        f = globals().get('__file__')
+        found = os.path.dirname(os.path.abspath(f)) if f else None
+    if found is None:
+        return None
+    # whichever copy answered, use the folder the window came from when it sits beside it
+    want = os.path.join(os.path.dirname(found), _FOLDER[0])
+    if os.path.basename(found) != _FOLDER[0] and os.path.isdir(want):
+        return want
+    return found
 
 
 def _project_dir():
@@ -817,8 +840,10 @@ def _info():
             'caps': caps, 'now': _now()}
 
 
-def _info_impl():
+def _info_impl(folder=None):
     try:
+        if folder and folder not in (u'.', u'..') and '/' not in folder and chr(92) not in folder:
+            _FOLDER[0] = unicode(folder)
         return _dumps(_info())
     except BaseException as e:
         return _fail(e)
@@ -1046,8 +1071,8 @@ def probe():
     return _guard(_probe_impl)
 
 
-def info():
-    return _guard(_info_impl)
+def info(folder=None):
+    return _guard(_info_impl, folder)
 
 
 def make_layer(name, url, seconds=LAYER_SECONDS):

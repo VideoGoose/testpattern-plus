@@ -6,12 +6,12 @@ LED modules, with tile sizes taken from an editable product list. Presets are sa
 they can move between projects. Runs from the project's `plugins` folder, with no bridge.
 
 ```
-python build.py                                # -> dist/gus_testpattern/
+python build.py                                # -> dist/testpattern-plus/
 python build.py --install "<project>\plugins"  # build + copy + byte-check
 python tests/run_tests.py                      # after: npm install; npx playwright install chromium
 ```
 
-In the installed plugin folder (`<project>\plugins\gus_testpattern\`):
+In the installed plugin folder (`<project>\plugins\testpattern-plus\`):
 
 - `led_products.csv` lists LED products (tile px/mm, modules per tile). Edit it in Excel, save it as
   CSV, then press ↻ in the plugin window.

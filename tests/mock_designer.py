@@ -1,7 +1,7 @@
 """
 Stand-in for Designer, for tests only.
 
-- Serves {project}/plugins/gus_testpattern/ at /plugins/gus_testpattern/
+- Serves {project}/plugins/<folder>/ at /plugins/<folder>/ (any plugin folder name)
 - GET  /api/session/status/session
 - POST /api/session/python/registermodule  {moduleName, contents}
 - POST /api/session/python/execute         {moduleName, script}
@@ -241,13 +241,14 @@ class H(BaseHTTPRequestHandler):
                             'sizeModeSeqOff': l.findSequence('size_mode').disableSequencing})
             MOCK_INTERNAL[0] = False
             return self._send(200, out)
-        prefix = '/plugins/gus_testpattern/'
+        prefix = '/plugins/'
         if path.startswith(prefix):
-            rel = path[len(prefix):] or 'index.html'
             from urllib.parse import unquote
-            rel = unquote(rel)
-            f = os.path.normpath(os.path.join(self.server.plugin, rel))
-            if not f.startswith(self.server.plugin) or not os.path.isfile(f):
+            rel = unquote(path[len(prefix):])
+            if rel.endswith('/'):
+                rel += 'index.html'
+            f = os.path.normpath(os.path.join(self.server.plugins, rel))
+            if not f.startswith(self.server.plugins + os.sep) or not os.path.isfile(f):
                 return self._send(404, b'nf', 'text/plain')
             ext = f.rsplit('.', 1)[-1].lower()
             ct = {'html': 'text/html; charset=utf-8', 'png': 'image/png', 'svg': 'image/svg+xml',
@@ -288,10 +289,10 @@ class H(BaseHTTPRequestHandler):
 
 
 def serve(project, port):
-    plugin = os.path.join(project, 'plugins', 'gus_testpattern')
-    sys.path.insert(0, os.path.join(project, 'plugins'))   # so `import gus_testpattern` finds __file__
+    plugins = os.path.join(project, 'plugins')
+    sys.path.insert(0, plugins)   # so __import__('<folder>') finds the plugin's __init__.py and its __file__
     srv = ThreadingHTTPServer(('0.0.0.0', port), H)
-    srv.plugin = os.path.abspath(plugin)
+    srv.plugins = os.path.abspath(plugins)
     return srv
 
 
