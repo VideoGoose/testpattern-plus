@@ -23,11 +23,20 @@
   // name: [type, default, min, max, label, group]
   var SCHEMA = {
     ledWall:          ['bool', 0, 0, 1, 'LED wall mode', 'LED wall'],
+    ledProduct:       ['str', '', 0, 96, 'LED product (led_products.csv)', 'LED wall'],
     tileW:            ['int', 192, 8, 4096, 'Tile width (px)', 'LED wall'],
     tileH:            ['int', 192, 8, 4096, 'Tile height (px)', 'LED wall'],
     tilesX:           ['int', 10, 1, 256, 'Wall width (tiles)', 'LED wall'],
     tilesY:           ['int', 6, 1, 256, 'Wall height (full tiles)', 'LED wall'],
     halfTile:         ['enum', 0, 0, 2, 'Half-tile row', 'LED wall', ['None', 'Top', 'Bottom']],
+    modulesX:         ['int', 2, 1, 64, 'Modules across (per tile)', 'LED wall'],
+    modulesY:         ['int', 2, 1, 64, 'Modules down (per tile)', 'LED wall'],
+    modulesHalfY:     ['int', 0, 0, 64, 'Modules down, half tile (0 = auto)', 'LED wall'],
+    moduleShow:       ['enum', 0, 0, 3, 'Show modules', 'LED wall', ['Off', 'Alternate shading', 'Outlines', 'Shading + outlines']],
+    moduleColour:     ['colour', '#ffffff', 0, 0, 'Module shading colour', 'LED wall'],
+    moduleOpacity:    ['float', 0.18, 0.02, 1, 'Module shading strength', 'LED wall'],
+    moduleOutline:    ['int', 1, 1, 32, 'Module outline (px)', 'LED wall'],
+    moduleOutlineColour:['colour', '#8c8c8c', 0, 0, 'Module outline colour', 'LED wall'],
     tileFill:         ['enum', 0, 0, 6, 'Tile colours', 'LED wall',
                        ['Checker', 'Columns', 'Rows', 'Rainbow across', 'Rainbow down', 'By port', 'Solid']],
     tileColourA:      ['colour', '#1d1d1d', 0, 0, 'Tile colour A', 'LED wall'],
@@ -205,12 +214,20 @@
   }
   function tag(i, asLetters, start) { return asLetters ? letters(i) : String(i + start); }
 
+  // Module rows in a half tile: explicit, else half the full tile's rows (CB3: 8 -> 4).
+  function halfModulesY(s) {
+    return s.modulesHalfY > 0 ? s.modulesHalfY
+      : Math.max(1, Math.round(s.modulesY * Math.floor(s.tileH / 2) / s.tileH));
+  }
+
   // Tiles with geometry, grid ref and sequence index, in wall order.
+  // mnx/mny: modules in the tile; mr0: wall module row of its first module row.
   function wallTiles(s) {
-    var nx = s.tilesX, rows = [], y = 0, i, half = Math.floor(s.tileH / 2);
-    if (s.halfTile === 1) { rows.push({ y: 0, h: half, half: true }); y = half; }
-    for (i = 0; i < s.tilesY; i++) { rows.push({ y: y, h: s.tileH, half: false }); y += s.tileH; }
-    if (s.halfTile === 2) rows.push({ y: y, h: half, half: true });
+    var nx = s.tilesX, rows = [], y = 0, i, half = Math.floor(s.tileH / 2), hm = halfModulesY(s);
+    if (s.halfTile === 1) { rows.push({ y: 0, h: half, half: true, mny: hm }); y = half; }
+    for (i = 0; i < s.tilesY; i++) { rows.push({ y: y, h: s.tileH, half: false, mny: s.modulesY }); y += s.tileH; }
+    if (s.halfTile === 2) rows.push({ y: y, h: half, half: true, mny: hm });
+    for (i = 0, y = 0; i < rows.length; i++) { rows[i].mr0 = y; y += rows[i].mny; }
     var ny = rows.length, fromRight = s.startCorner === 1 || s.startCorner === 3,
         fromBottom = s.startCorner >= 2, tiles = [];
     for (var r = 0; r < ny; r++) {
@@ -220,6 +237,7 @@
         else seq = lc * ny + (s.serpentine && lc % 2 ? ny - 1 - lr : lr);
         tiles.push({ x: c * s.tileW, y: rows[r].y, w: s.tileW, h: rows[r].h, half: rows[r].half,
                      col: c, row: r, lc: lc, lr: lr, seq: seq,
+                     mnx: s.modulesX, mny: rows[r].mny, mr0: rows[r].mr0,
                      port: s.portTiles > 0 ? Math.floor(seq / s.portTiles) : -1 });
       }
     }
@@ -273,7 +291,34 @@
     var W = wallTiles(s), T = W.tiles, i, t, font = opts.font || 'Helvetica, Arial, sans-serif';
     if (phase === 'fill') {
       for (i = 0; i < T.length; i++) { t = T[i]; ctx.fillStyle = tileColour(s, t, W); ctx.fillRect(t.x, t.y, t.w, t.h); }
+      // every other module, checkered across the whole wall, tinted over the tile colour
+      if (s.moduleShow === 1 || s.moduleShow === 3) {
+        ctx.globalAlpha = s.moduleOpacity;
+        ctx.fillStyle = s.moduleColour;
+        for (i = 0; i < T.length; i++) {
+          t = T[i];
+          for (var mj = 0; mj < t.mny; mj++) {
+            var y0 = t.y + Math.round(mj * t.h / t.mny), y1 = t.y + Math.round((mj + 1) * t.h / t.mny);
+            for (var mi = 0; mi < t.mnx; mi++) {
+              if ((t.col * t.mnx + mi + t.mr0 + mj) % 2 === 0) continue;
+              var x0 = t.x + Math.round(mi * t.w / t.mnx), x1 = t.x + Math.round((mi + 1) * t.w / t.mnx);
+              ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+            }
+          }
+        }
+        ctx.globalAlpha = 1;
+      }
       return;
+    }
+    // module seams (inside each tile; the tile outline covers the tile edges)
+    if (s.moduleShow >= 2) {
+      ctx.fillStyle = s.moduleOutlineColour;
+      var mo = s.moduleOutline, mh = Math.floor(mo / 2), k;
+      for (i = 0; i < T.length; i++) {
+        t = T[i];
+        for (k = 1; k < t.mnx; k++) ctx.fillRect(t.x + Math.round(k * t.w / t.mnx) - mh, t.y, mo, t.h);
+        for (k = 1; k < t.mny; k++) ctx.fillRect(t.x, t.y + Math.round(k * t.h / t.mny) - mh, t.w, mo);
+      }
     }
     // outlines: drawn inside each tile edge so every tile shows its own full border
     if (s.tileOutline > 0) {
@@ -454,6 +499,6 @@
   }
 
   return { SCHEMA: SCHEMA, defaults: defaults, sanitise: sanitise, render: render,
-           wallSize: wallSize, wallTiles: wallTiles, letters: letters, outputSize: outputSize,
+           wallSize: wallSize, wallTiles: wallTiles, halfModulesY: halfModulesY, letters: letters, outputSize: outputSize,
            buildLut: buildLut, linePositions: linePositions, band: band };
 });

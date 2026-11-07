@@ -121,7 +121,8 @@
   <span id="status" class="pill"><span class="dot"></span><span id="statusTxt">connecting…</span></span>
   <span class="spacer"></span>
   <select id="presetSel"><option value="">Presets…</option></select>
-  <button id="presetSave">Save preset</button>
+  <button id="presetSave" title="Save the current settings as a file in this plugin's presets folder">Save preset</button>
+  <button id="presetDel" title="Delete the preset you last loaded or saved">Delete preset</button>
   <button id="reset">Reset</button>
 </header>
 <main>
@@ -175,6 +176,8 @@
   var mod = REG_NAME, session = null, info = null;
   var state = GusTP.defaults(), target = '', layerCache = [], logoImgs = { tl: null, br: null };
   var inputs = {}, logoSelects = {}, pushTimer = null, pushing = false, pushAgain = false;
+  var products = [], productSel = null, PRODUCT_KEYS = ['tileW', 'tileH', 'modulesX', 'modulesY', 'modulesHalfY'];
+  var filePresets = null, presetDir = '', lastPreset = '';
   var store = { get: function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
                 set: function (k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
 
@@ -366,6 +369,9 @@
       if (g === 'LED wall') {
         var wn = document.createElement('div'); wn.className = 'note'; wn.id = 'wallNote';
         d.appendChild(wn);
+        var pn = document.createElement('div'); pn.className = 'note'; pn.id = 'productNote';
+        pn.textContent = 'Products come from led_products.csv in this plugin\'s folder: edit it in Excel, save as CSV, then press ↻.';
+        d.appendChild(pn);
       }
       if (g === 'Logos') {
         var n = document.createElement('div'); n.className = 'note';
@@ -382,7 +388,19 @@
     var lab = document.createElement('label'); lab.textContent = spec[4];
     lab.title = 'Double-click to reset'; lab.ondblclick = function () { set(k, spec[1]); };
     r.appendChild(lab);
-    if (k === 'logoTLFile' || k === 'logoBRFile') {
+    if (k === 'ledProduct') {
+      r.classList.add('wide');
+      var ps = document.createElement('select');
+      addOpt(ps, '', '— custom —');
+      ps.onchange = function () { applyProduct(ps.value); };
+      r.appendChild(ps);
+      picker(ps);
+      productSel = ps;
+      inputs[k] = { set: function (v) {
+        if (v && ![].some.call(ps.options, function (o) { return o.value === v; })) addOpt(ps, v, v + ' (not in led_products.csv)');
+        ps.value = v;
+      } };
+    } else if (k === 'logoTLFile' || k === 'logoBRFile') {
       r.classList.add('wide');
       var sel = document.createElement('select');
       sel.onchange = function () { set(k, sel.value); };
@@ -461,9 +479,16 @@
     var wn = $('wallNote');
     if (wn) {
       var ws = GusTP.wallSize(state), rows = state.tilesY + (state.halfTile ? 0.5 : 0);
-      wn.textContent = (state.ledWall ? 'Wall: ' : 'Off. Wall would be: ') + ws[0] + ' × ' + ws[1] + ' px · ' +
+      var prod = productByName(state.ledProduct), mm = '';
+      if (prod && prod.wmm > 0 && prod.hmm > 0) {
+        mm = ' · ' + (state.tilesX * prod.wmm / 1000).toFixed(2) + ' × ' +
+             ((state.tilesY * prod.hmm + (state.halfTile ? prod.hmm / 2 : 0)) / 1000).toFixed(2) + ' m';
+      }
+      wn.textContent = (state.ledWall ? 'Wall: ' : 'Off. Wall would be: ') + ws[0] + ' × ' + ws[1] + ' px' + mm + ' · ' +
         state.tilesX + ' × ' + rows + ' tiles (' + (state.tilesX * (state.tilesY + (state.halfTile ? 1 : 0))) + ' panels' +
         (state.halfTile ? ', ' + state.tilesX + ' half' : '') + ')' +
+        ' · modules ' + state.modulesX + ' × ' + state.modulesY + ' per tile' +
+        (state.halfTile ? ', ' + state.modulesX + ' × ' + GusTP.halfModulesY(state) + ' per half tile' : '') +
         (state.portTiles > 0 ? ' · ' + Math.ceil(state.tilesX * (state.tilesY + (state.halfTile ? 1 : 0)) / state.portTiles) + ' ports' : '') +
         (state.ledWall ? '. Overrides Resolution; set the layer mapping to this size.' : '');
     }
@@ -473,14 +498,111 @@
     });
   }
 
-  function set(k, v) {
-    var p = {}; p[k] = v;
+  function set(k, v) { var p = {}; p[k] = v; setMany(p); }
+
+  function setMany(p) {
     // switching LED wall on: clear the pixel-grid furniture so the tiles read cleanly
     // (each can be turned back on afterwards)
-    if (k === 'ledWall' && v && !state.ledWall) { p.gridMode = 0; p.circles = 0; p.centreCross = 0; p.diagonals = 0; }
+    if (p.ledWall && !state.ledWall) { p.gridMode = 0; p.circles = 0; p.centreCross = 0; p.diagonals = 0; }
     state = GusTP.sanitise(p, state);
-    if (k === 'logoTLFile' || k === 'logoBRFile') loadLogos();
+    // hand-editing tile size / modules away from the chosen product makes it custom
+    if (state.ledProduct && !('ledProduct' in p) && products.length &&
+        PRODUCT_KEYS.some(function (k) { return k in p; }) && !productMatches(state)) state.ledProduct = '';
+    if ('logoTLFile' in p || 'logoBRFile' in p) loadLogos();
     refreshInputs(); drawPreview(); queuePush();
+  }
+
+  // ---- LED products: led_products.csv in the plugin folder ---------------
+  // One row per product; Excel-friendly (comma, semicolon or tab separated, quotes, BOM).
+  function parseCsv(text) {
+    text = String(text || '').replace(/^﻿/, '');
+    var first = text.split(/\r?\n/)[0] || '';
+    var delim = [',', ';', '\t'].sort(function (a, b) { return first.split(b).length - first.split(a).length; })[0];
+    var rows = [], row = [], f = '', q = false;
+    for (var i = 0; i < text.length; i++) {
+      var c = text[i];
+      if (q) {
+        if (c === '"') { if (text[i + 1] === '"') { f += '"'; i++; } else q = false; }
+        else f += c;
+      } else if (c === '"') q = true;
+      else if (c === delim) { row.push(f); f = ''; }
+      else if (c === '\n' || c === '\r') {
+        if (c === '\r' && text[i + 1] === '\n') i++;
+        row.push(f); rows.push(row); row = []; f = '';
+      } else f += c;
+    }
+    if (f || row.length) { row.push(f); rows.push(row); }
+    return rows;
+  }
+  function parseProducts(text) {
+    var rows = parseCsv(text);
+    if (!rows.length) return [];
+    var head = rows[0].map(function (h) { return h.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, ''); });
+    function col(r, names) {
+      for (var i = 0; i < names.length; i++) { var j = head.indexOf(names[i]); if (j >= 0) return (r[j] || '').trim(); }
+      return '';
+    }
+    function num(v) { var n = parseFloat(String(v).replace(',', '.')); return isFinite(n) ? n : 0; }
+    var out = [], seen = {};
+    rows.slice(1).forEach(function (r) {
+      if (!r.join('').trim() || /^\s*#/.test(r[0] || '')) return;     // blank / # comment rows
+      var name = (col(r, ['manufacturer', 'make', 'brand']) + ' ' + col(r, ['product', 'model', 'name'])).trim();
+      var p = { name: name.slice(0, 96),
+                tileW: Math.round(num(col(r, ['tile_w_px', 'tile_width_px', 'width_px']))),
+                tileH: Math.round(num(col(r, ['tile_h_px', 'tile_height_px', 'height_px']))),
+                modulesX: Math.round(num(col(r, ['modules_across', 'modules_x', 'modules_wide']))) || 2,
+                modulesY: Math.round(num(col(r, ['modules_down', 'modules_y', 'modules_high', 'modules_tall']))) || 2,
+                modulesHalfY: Math.round(num(col(r, ['half_modules_down', 'half_tile_modules_down', 'half_modules_y']))),
+                pitch: num(col(r, ['pitch_mm', 'pitch'])),
+                wmm: num(col(r, ['tile_w_mm', 'tile_width_mm', 'width_mm'])),
+                hmm: num(col(r, ['tile_h_mm', 'tile_height_mm', 'height_mm'])),
+                notes: col(r, ['notes', 'note', 'comments']) };
+      if (!p.name || p.tileW < 8 || p.tileH < 8 || seen[p.name]) return;
+      seen[p.name] = 1;
+      out.push(p);
+    });
+    return out;
+  }
+  function productByName(n) { return n ? products.filter(function (p) { return p.name === n; })[0] : null; }
+  function productPatch(p) {
+    return { tileW: p.tileW, tileH: p.tileH, modulesX: p.modulesX, modulesY: p.modulesY, modulesHalfY: p.modulesHalfY };
+  }
+  function productMatches(s) {
+    var p = productByName(s.ledProduct), pp = p && GusTP.sanitise(productPatch(p), s);
+    return !!p && PRODUCT_KEYS.every(function (k) { return pp[k] === s[k]; });
+  }
+  function applyProduct(name) {
+    var p = productByName(name);
+    if (!p) { set('ledProduct', ''); return; }
+    var patch = productPatch(p);
+    patch.ledProduct = name;
+    if (!state.moduleShow) patch.moduleShow = 1;       // picking a product shows its modules
+    setMany(patch);
+    toast(name + ': ' + p.tileW + ' × ' + p.tileH + ' px tiles, ' + p.modulesX + ' × ' + p.modulesY + ' modules' +
+          (p.pitch ? ', ' + p.pitch + ' mm' : '') + (p.notes ? '\n' + p.notes : ''), 5000);
+  }
+  function loadProducts() {
+    var viaPy = info ? call('led_products').then(function (r) {
+      if (!r.ok) throw new Error(r.error);
+      if (r.missing) diag('! no led_products.csv in the plugin folder');
+      return r.text || '';
+    }) : Promise.reject(new Error('not connected'));
+    return viaPy.catch(function (e) {
+      // preview-only / no Designer Python: read the file as a page asset
+      if (info) diag('✗ led_products(): ' + e.message + ' → fetching the file');
+      return fetch(new URL('led_products.csv', location.href).href, { cache: 'no-store' })
+        .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); });
+    }).then(function (text) {
+      products = parseProducts(text);
+      productSel.innerHTML = '';
+      addOpt(productSel, '', '— custom —');
+      products.forEach(function (p) {
+        addOpt(productSel, p.name, p.name + ' · ' + p.tileW + '×' + p.tileH + ' px · ' + p.modulesX + '×' + p.modulesY + ' modules');
+      });
+      inputs.ledProduct.set(state.ledProduct);
+      diag('✓ ' + products.length + ' LED products from led_products.csv');
+      refreshInputs();
+    }).catch(function (e) { diag('✗ LED products: ' + e.message); });
   }
 
   function replaceState(s) { state = GusTP.sanitise(s); loadLogos(); refreshInputs(); drawPreview(); }
@@ -658,7 +780,8 @@
         sel.value = state[k];
       });
       refreshInputs();
-    }).catch(function (e) { status('err', 'Designer error'); toast(e.message, 6000); });
+    }).catch(function (e) { status('err', 'Designer error'); toast(e.message, 6000); })
+      .then(loadProducts).then(loadPresets);
   }
 
   function adoptLayer(name) {
@@ -757,23 +880,116 @@
     }).catch(function (e) { toast('Screens: ' + e.message); });
   };
 
-  function presets() { try { return JSON.parse(store.get('tp.presets') || '{}'); } catch (e) { return {}; } }
+  // ---- presets: one JSON file each in <plugin>/presets/ ------------------
+  // Copy a file into another project's plugins/gus_testpattern/presets/ to move it.
+  // Without a Designer connection they fall back to this window's own storage.
+  var PRESET_SKIP = { labelText: 1, resW: 1, resH: 1 };      // per-layer, never in a preset
+  function localPresets() { try { return JSON.parse(store.get('tp.presets') || '{}'); } catch (e) { return {}; } }
+  function presets() {
+    if (!filePresets) return localPresets();
+    var o = {};
+    Object.keys(filePresets).forEach(function (n) { o[n] = filePresets[n].settings; });
+    return o;
+  }
+  function presetSettings(s) {
+    var o = {};
+    Object.keys(SCHEMA).forEach(function (k) { if (!PRESET_SKIP[k] && s[k] !== D[k]) o[k] = s[k]; });
+    return o;
+  }
+  function presetFileText(name, settings) {
+    return JSON.stringify({ plugin: 'Test Pattern+', version: VERSION, name: name,
+                            saved: new Date().toISOString(), settings: settings }, null, 2) + '\n';
+  }
   function fillPresets() {
     var sel = $('presetSel'), p = presets(); sel.length = 1;
-    Object.keys(p).sort().forEach(function (n) { addOpt(sel, n); });
+    Object.keys(p).sort(function (a, b) { return a.toLowerCase() < b.toLowerCase() ? -1 : 1; })
+      .forEach(function (n) { addOpt(sel, n); });
+    $('presetDel').disabled = !lastPreset || !(lastPreset in p);
+  }
+  function loadPresets() {
+    if (!info) { filePresets = null; fillPresets(); return Promise.resolve(); }
+    return call('list_presets').then(function (r) {
+      if (!r.ok) throw new Error(r.error);
+      presetDir = r.dir || '';
+      var fp = {};
+      (r.presets || []).forEach(function (f) {
+        var n = f.file.replace(/\.json$/i, '');          // the file name is the preset name
+        try {
+          var j = JSON.parse(f.text);
+          fp[n] = { file: f.file, settings: j && typeof j.settings === 'object' ? j.settings : j };
+        } catch (e) { diag('✗ preset ' + f.file + ' is not valid JSON, skipped'); }
+      });
+      filePresets = fp;
+      diag('✓ ' + Object.keys(fp).length + ' presets in ' + presetDir);
+      return migrateLocalPresets();
+    }).catch(function (e) { diag('✗ presets folder: ' + e.message + ' (using this window\'s presets)'); filePresets = null; })
+      .then(fillPresets);
+  }
+  // presets saved before v2.13.0 lived in the window; write them out as files once
+  function migrateLocalPresets() {
+    var lp = localPresets(), names = Object.keys(lp), moved = 0;
+    if (!names.length) return Promise.resolve();
+    return names.reduce(function (p, n) {
+      return p.then(function () {
+        if (filePresets[n]) { delete lp[n]; return; }
+        var settings = presetSettings(GusTP.sanitise(lp[n]));
+        return call('save_preset', n, presetFileText(n, settings)).then(function (r) {
+          if (!r.ok) { diag('✗ could not move preset ' + n + ': ' + r.error); return; }
+          filePresets[r.file.replace(/\.json$/i, '')] = { file: r.file, settings: settings };
+          delete lp[n]; moved++;
+        });
+      });
+    }, Promise.resolve()).then(function () {
+      store.set('tp.presets', JSON.stringify(lp));
+      if (moved) toast('Moved ' + moved + ' preset' + (moved > 1 ? 's' : '') + ' from this window into\n' + presetDir, 6000);
+    });
   }
   $('presetSel').onchange = function () {
-    var p = presets()[this.value]; this.value = '';
+    var n = this.value, p = presets()[n]; this.value = '';
     if (!p) return;
+    lastPreset = n;
+    // settings missing from the file are defaults; the layer keeps its label and resolution
     replaceState(Object.assign({}, p, { labelText: state.labelText, resW: state.resW, resH: state.resH }));
-    queuePush();
+    queuePush(); fillPresets();
+    toast('Loaded preset "' + n + '".');
   };
   $('presetSave').onclick = function () {
-    ask('Preset name:', '').then(function (n) {
-      if (!n) return;
-      var p = presets(); p[n] = state; store.set('tp.presets', JSON.stringify(p)); fillPresets();
-      toast('Saved preset "' + n + '" (stored in this plugin window).');
-    });
+    var name;
+    ask('Preset name:', lastPreset).then(function (n) {
+      if (!n) return false;
+      name = n;
+      var existing = Object.keys(presets()).filter(function (x) { return x.toLowerCase() === n.toLowerCase(); })[0];
+      return existing ? askYes('Replace preset "' + existing + '"?') : true;
+    }).then(function (go) {
+      if (!go) return;
+      var settings = presetSettings(state);
+      if (!filePresets) {
+        var lp = localPresets(); lp[name] = settings; store.set('tp.presets', JSON.stringify(lp));
+        lastPreset = name; fillPresets();
+        toast('Not connected to Designer: saved "' + name + '" in this window only.\nIt moves to the presets folder next time you connect.', 6000);
+        return;
+      }
+      return call('save_preset', name, presetFileText(name, settings)).then(function (r) {
+        if (!r.ok) throw new Error(r.error);
+        lastPreset = r.file.replace(/\.json$/i, '');
+        filePresets[lastPreset] = { file: r.file, settings: settings };
+        fillPresets();
+        toast('Saved preset file:\n' + r.path + '\nCopy it to another project\'s gus_testpattern\\presets folder to use it there.', 7000);
+      });
+    }).catch(function (e) { toast('Preset not saved: ' + e.message, 6000); });
+  };
+  $('presetDel').onclick = function () {
+    var n = lastPreset;
+    if (!n || !(n in presets())) return;
+    askYes('Delete preset "' + n + '"' + (filePresets ? ' (' + filePresets[n].file + ')' : '') + '?').then(function (ok) {
+      if (!ok) return;
+      if (!filePresets) { var lp = localPresets(); delete lp[n]; store.set('tp.presets', JSON.stringify(lp)); lastPreset = ''; fillPresets(); return; }
+      return call('delete_preset', filePresets[n].file.replace(/\.json$/i, '')).then(function (r) {
+        if (!r.ok) throw new Error(r.error);
+        delete filePresets[n]; lastPreset = ''; fillPresets();
+        toast('Deleted ' + r.path);
+      });
+    }).catch(function (e) { toast('Preset not deleted: ' + e.message, 6000); });
   };
 
   // ---- view log: record size / scale changes (diagnostics only) ---------
@@ -829,6 +1045,8 @@
         diag('✗ ' + e.message);
         status('err', 'Designer not reachable');
         $('diag').classList.add('show');
+        info = null;
+        return loadProducts().then(loadPresets);      // preview-only: CSV as a page asset, window presets
       })
       .then(function () { refreshInputs(); drawPreview(); });
   }

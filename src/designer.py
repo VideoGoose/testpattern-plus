@@ -13,6 +13,10 @@ quick pass on the render thread. Every function returns a JSON string.
     screens()                      project screens with resolutions
     write_chunk(path, b64, first)  write an exported PNG/TIF in pieces
     list_logos()                   image files in <plugin>/logos/
+    led_products()                 text of <plugin>/led_products.csv (parsed in the window)
+    list_presets()                 every <plugin>/presets/*.json, as text
+    save_preset(name, text)        write <plugin>/presets/<name>.json
+    delete_preset(name)            remove it
     probe()                        dump member names to pin the soft spots
 
 Soft spots (public docs list WebModule but not its fields): the URL field
@@ -38,6 +42,9 @@ SIZE_MODE_MATCH_MAPPING = 0      # Designer's list: 0 Match Mapping, 1 Custom (s
 PLUGIN_MODULE_NAMES = ('gus_testpattern', 'user_module_gus_testpattern')
 EXPORT_EXTS = ('.png', '.tif', '.tiff')
 IMAGE_EXTS = ('.png', '.jpg', '.jpeg', '.webp', '.svg')
+PRODUCTS_FILE = 'led_products.csv'
+PRESET_DIR = 'presets'
+PRESET_MAX = 256 * 1024
 
 try:
     unicode
@@ -859,6 +866,93 @@ def _list_logos_impl():
         return _fail(e, logos=[])
 
 
+def _read_text(p):
+    """File as unicode. Excel saves CSV as UTF-8 with a BOM, or as Windows-1252."""
+    f = open(p, 'rb')
+    try:
+        data = f.read()
+    finally:
+        f.close()
+    for enc in ('utf-8-sig', 'cp1252', 'latin-1'):
+        try:
+            return data.decode(enc)
+        except:  # noqa: E722
+            continue
+    return u''
+
+
+def _write_text(p, text):
+    if not isinstance(text, unicode):
+        text = text.decode('utf-8')
+    f = open(p, 'wb')
+    try:
+        f.write(text.encode('utf-8'))
+    finally:
+        f.close()
+
+
+def _need_plugin_dir():
+    os, pd = _os(), _plugin_dir()
+    if not (os and pd):
+        raise Exception('plugin folder not found from Designer Python')
+    return os, pd
+
+
+def _led_products_impl():
+    _at(u'find plugin folder')
+    os, pd = _need_plugin_dir()
+    p = os.path.join(pd, PRODUCTS_FILE)
+    if not os.path.isfile(p):
+        return _ok(text=u'', path=p, missing=True)
+    _at(u'read ' + PRODUCTS_FILE)
+    return _ok(text=_read_text(p), path=p)
+
+
+def _preset_file(name):
+    os, pd = _need_plugin_dir()
+    safe = _safe_name(name)
+    if safe.startswith(u'.'):
+        safe = u'_' + safe[1:]
+    return os, os.path.join(pd, PRESET_DIR), safe + u'.json'
+
+
+def _list_presets_impl():
+    _at(u'find plugin folder')
+    os, pd = _need_plugin_dir()
+    d = os.path.join(pd, PRESET_DIR)
+    out = []
+    if os.path.isdir(d):
+        for f in sorted(os.listdir(d)):
+            p = os.path.join(d, f)
+            if not f.lower().endswith('.json') or not os.path.isfile(p) or os.path.getsize(p) > PRESET_MAX:
+                continue
+            _at(u'read preset ' + f)
+            out.append({'file': f, 'text': _read_text(p)})
+    return _ok(presets=out, dir=d)
+
+
+def _save_preset_impl(name, text):
+    if not text or len(text) > PRESET_MAX or not text.lstrip().startswith(u'{'):
+        return _fail('preset text must be a JSON object under %d KB' % (PRESET_MAX // 1024))
+    os, d, f = _preset_file(name)
+    _at(u'make ' + d)
+    if not os.path.isdir(d):
+        os.makedirs(d)
+    p = os.path.join(d, f)
+    _at(u'write ' + p)
+    _write_text(p, text)
+    return _ok(file=f, path=p, dir=d)
+
+
+def _delete_preset_impl(name):
+    os, d, f = _preset_file(name)
+    p = os.path.join(d, f)
+    if not os.path.isfile(p):
+        return _fail('no preset file %s' % f)
+    os.remove(p)
+    return _ok(file=f, path=p)
+
+
 def _public(o):
     try:
         return sorted(a for a in dir(o) if not a.startswith('_'))
@@ -927,6 +1021,22 @@ def write_chunk(path, b64, first):
 
 def list_logos():
     return _guard(_list_logos_impl)
+
+
+def led_products():
+    return _guard(_led_products_impl)
+
+
+def list_presets():
+    return _guard(_list_presets_impl)
+
+
+def save_preset(name, text):
+    return _guard(_save_preset_impl, name, text)
+
+
+def delete_preset(name):
+    return _guard(_delete_preset_impl, name)
 
 
 def probe():

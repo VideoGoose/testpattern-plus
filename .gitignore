@@ -2,3 +2,8 @@ node_modules/
 dist/
 tests/out/
 __pycache__/
+*.pyc
+.claude/settings.local.json
+Thumbs.db
+Desktop.ini
+.DS_Store
