@@ -1,0 +1,82 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="generator" content="Test Pattern+ v@VERSION@">
+<title>Test Pattern+ output v@VERSION@</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #000; overflow: hidden; width: 100%; height: 100%; cursor: none; }
+  canvas { display: block; position: absolute; left: 0; top: 0; image-rendering: pixelated; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+/*@PATTERN@*/
+</script>
+<script>
+/*
+ * Output page for a Designer Web layer. Everything it draws comes from the
+ * part of its own URL after '#', e.g.
+ *   out.html#name=LED_A&gridThickness=6&gridColour=%2333d1ff
+ * The plugin rewrites that URL to adjust the pattern; a hash-only change
+ * doesn't reload the page, it fires 'hashchange' and redraws in place.
+ */
+(function () {
+  'use strict';
+  var canvas = document.getElementById('c');
+  var ctx = canvas.getContext('2d', { alpha: false });
+  var state = GusTP.defaults(), name = '', pending = false;
+  var logos = { tl: { f: '', img: null }, br: { f: '', img: null } };
+
+  function parse() {
+    var p = new URLSearchParams(location.hash.replace(/^#/, '')), o = {};
+    p.forEach(function (v, k) { o[k] = v; });
+    name = o.name || '';
+    state = GusTP.sanitise(o);
+  }
+
+  function logo(slot, file) {
+    var L = logos[slot];
+    file = /^[A-Za-z0-9 _.\-]{1,96}$/.test(file || '') ? file : '';
+    if (L.f === file) return;
+    L.f = file; L.img = null;
+    if (!file) return;
+    var img = new Image();
+    img.onload = function () { if (L.f === file) { L.img = img; schedule(); } };
+    img.src = new URL('logos/' + encodeURIComponent(file), location.href).href;
+  }
+
+  function draw() {
+    pending = false;
+    var dpr = window.devicePixelRatio || 1;
+    // Designer zooms Web layer browsers; innerWidth*dpr then lands a hair off the
+    // real size (1919.4 for 1920). Snap to the nearest multiple of 8 within 2 px.
+    function snap(v) { var r = Math.round(v), e = Math.round(v / 8) * 8; return Math.abs(v - e) <= 2 ? e : r; }
+    var vw = snap(window.innerWidth * dpr), vh = snap(window.innerHeight * dpr);
+    var sz = GusTP.outputSize(state, vw, vh), w = sz[0], h = sz[1];
+    var fixedW = state.ledWall || state.resW > 0, fixedH = state.ledWall || state.resH > 0;
+    if (canvas.width !== w) canvas.width = w;
+    if (canvas.height !== h) canvas.height = h;
+    canvas.style.width = (fixedW ? window.innerWidth : vw / dpr) + 'px';
+    canvas.style.height = (fixedH ? window.innerHeight : vh / dpr) + 'px';
+    GusTP.render(ctx, w, h, state, { channel: name, logoTL: logos.tl.img, logoBR: logos.br.img });
+  }
+
+  function schedule() { if (!pending) { pending = true; requestAnimationFrame(draw); } }
+
+  function update() {
+    parse();
+    logo('tl', state.logoTLFile);
+    logo('br', state.logoBRFile);
+    schedule();
+  }
+
+  window.addEventListener('hashchange', update);
+  window.addEventListener('resize', schedule);
+  update();
+})();
+</script>
+</body>
+</html>

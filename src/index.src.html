@@ -1,0 +1,853 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>Test Pattern+ v@VERSION@</title>
+<style>
+  :root {
+    --bg: #15171a; --panel: #1d2024; --line: #2c3036; --text: #d8dce2; --dim: #8a929c;
+    --accent: #f2b33d; --live: #3ecf6e; --warn: #e5534b; --field: #111316;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--text);
+    font: 12px/1.35 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  header, #footer { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 8px 10px;
+    background: var(--panel); }
+  header { border-bottom: 1px solid var(--line); }
+  #footer { border-top: 1px solid var(--line); }
+  .title { font-weight: 700; letter-spacing: .02em; margin-right: 4px; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; border-radius: 99px;
+    border: 1px solid var(--line); color: var(--dim); white-space: nowrap; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--dim); }
+  .pill.on .dot { background: var(--live); box-shadow: 0 0 6px var(--live); }
+  .pill.on { color: var(--text); }
+  .pill.err .dot { background: var(--warn); }
+  button, select, input[type=text], input[type=number] {
+    background: var(--field); color: var(--text); border: 1px solid var(--line); border-radius: 4px;
+    font: inherit; padding: 4px 7px; }
+  button { cursor: pointer; }
+  button:hover:not(:disabled) { border-color: var(--dim); }
+  button:disabled { opacity: .45; cursor: default; }
+  button.primary { background: var(--accent); color: #111; border-color: var(--accent); font-weight: 600; }
+  label.chk { display: inline-flex; gap: 5px; align-items: center; color: var(--dim); }
+  .spacer { flex: 1; }
+  .ver { font: 600 11px/1 ui-monospace, Menlo, Consolas, monospace; color: #111; background: var(--accent);
+    padding: 3px 6px; border-radius: 4px; margin-right: 4px; }
+  .ver.stale { background: var(--warn); color: #fff; }
+  main { display: grid; grid-template-columns: minmax(280px, 360px) minmax(0, 1fr); height: calc(100% - 90px); }
+  #controls { overflow-y: auto; border-right: 1px solid var(--line); padding-bottom: 24px; }
+  details { border-bottom: 1px solid var(--line); }
+  summary { cursor: pointer; padding: 8px 10px; font-weight: 600; color: var(--dim);
+    text-transform: uppercase; font-size: 11px; letter-spacing: .06em; user-select: none; }
+  details[open] summary { color: var(--text); }
+  .row { display: grid; grid-template-columns: 1fr 120px 58px; gap: 6px; align-items: center; padding: 3px 10px; }
+  .row.wide { grid-template-columns: 1fr 184px; }
+  .row label { color: var(--dim); }
+  .row.changed label { color: var(--accent); }
+  .row.dim { opacity: .45; }
+  .row input[type=range] { width: 100%; accent-color: var(--accent); }
+  .row input[type=number] { width: 58px; padding: 3px 4px; text-align: right; }
+  .row input[type=color] { width: 58px; height: 22px; padding: 0; border: 1px solid var(--line); background: none; border-radius: 3px; }
+  .row select, .row input[type=text] { width: 100%; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; padding: 3px 8px; }
+  .seg button.sel { background: var(--accent); color: #111; }
+  .note { color: var(--dim); padding: 4px 10px 8px; }
+  #stage { position: relative; display: flex; flex-direction: column; min-width: 0; }
+  #previewWrap { flex: 1; position: relative; overflow: hidden; min-width: 0; min-height: 0;
+    background: repeating-conic-gradient(#1a1c1f 0 25%, #16181a 0 50%) 0 0/20px 20px; }
+  /* absolutely positioned: the canvas's 1920+ px intrinsic size can't widen the page */
+  #preview { position: absolute; inset: 14px; margin: auto; width: auto; height: auto;
+    max-width: calc(100% - 28px); max-height: calc(100% - 28px); box-shadow: 0 0 0 1px var(--line); image-rendering: pixelated; }
+  #size input { width: 66px; }
+  #url { flex: 1; min-width: 200px; font-family: ui-monospace, Menlo, Consolas, monospace; }
+  #toast { position: fixed; right: 12px; bottom: 56px; background: var(--panel); border: 1px solid var(--line);
+    padding: 8px 12px; border-radius: 6px; max-width: 460px; opacity: 0; transition: opacity .2s;
+    pointer-events: none; white-space: pre-wrap; z-index: 5; }
+  #toast.show { opacity: 1; }
+  #screens { position: absolute; right: 10px; bottom: 10px; width: 300px; max-height: 60%; overflow: auto;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 6px; display: none; z-index: 2; }
+  #screens.show { display: block; }
+  #screens .s { display: flex; justify-content: space-between; padding: 6px 10px; cursor: pointer; border-bottom: 1px solid var(--line); }
+  #screens .s:hover { background: var(--field); }
+  .muted { color: var(--dim); }
+  #status { cursor: pointer; }
+  select.picked { display: none !important; }
+  .pick { position: relative; display: inline-block; min-width: 0; }
+  .row .pick { display: block; width: 100%; }
+  .pick > button { width: 100%; text-align: left; display: flex; gap: 6px; align-items: center; white-space: nowrap; }
+  .pick > button span { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+  .pick > button::after { content: '▾'; color: var(--dim); }
+  .pick-list { position: fixed; z-index: 8; background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.5); max-height: 50vh; overflow-y: auto; min-width: 160px; padding: 4px 0; }
+  .pick-list div { padding: 5px 10px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pick-list div:hover, .pick-list div.cur { background: var(--field); }
+  .pick-list div.cur { color: var(--accent); }
+  #ask { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: none; align-items: flex-start;
+    justify-content: center; padding-top: 70px; z-index: 7; }
+  #ask.show { display: flex; }
+  #ask .abox { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px;
+    width: min(380px, calc(100% - 32px)); display: flex; flex-direction: column; gap: 10px;
+    box-shadow: 0 8px 30px rgba(0,0,0,.5); }
+  #ask .arow { display: flex; gap: 8px; }
+  #ask.confirm #askInput { display: none; }
+  #diag { position: fixed; left: 50%; top: 56px; transform: translateX(-50%); width: min(640px, calc(100% - 32px));
+    background: var(--panel); border: 1px solid var(--warn); border-radius: 8px; padding: 10px 12px; z-index: 6;
+    display: none; box-shadow: 0 8px 30px rgba(0,0,0,.5); }
+  #diag.show { display: block; }
+  #diag .dhead, #diag .drow { display: flex; gap: 8px; align-items: center; }
+  #diag .drow { margin: 8px 0 6px; }
+  #diag .drow input { flex: 1; }
+  #diagLog { background: var(--field); border: 1px solid var(--line); border-radius: 4px; padding: 8px; margin: 8px 0 0;
+    max-height: 220px; overflow: auto; white-space: pre-wrap; word-break: break-all;
+    font: 11px/1.4 ui-monospace, Menlo, Consolas, monospace; user-select: text; }
+  @media (max-width: 760px) {
+    main { grid-template-columns: minmax(0, 1fr); grid-template-rows: 45% 55%; height: auto; min-height: calc(100% - 90px); }
+    #controls { border-right: 0; border-bottom: 1px solid var(--line); order: 2; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <span class="title">Test Pattern+</span><span id="ver" class="ver" title="Plugin version">v@VERSION@</span>
+  <select id="target" title="Web layer this window drives"></select>
+  <button id="refresh" title="Re-read Web layers on the current track">↻</button>
+  <button id="newLayer" class="primary">New Web layer</button>
+  <label class="chk" title="Push every change to the Web layer as you drag"><input type="checkbox" id="live" checked> Live</label>
+  <span id="status" class="pill"><span class="dot"></span><span id="statusTxt">connecting…</span></span>
+  <span class="spacer"></span>
+  <select id="presetSel"><option value="">Presets…</option></select>
+  <button id="presetSave">Save preset</button>
+  <button id="reset">Reset</button>
+</header>
+<main>
+  <section id="controls"></section>
+  <section id="stage">
+    <div id="screens"></div>
+    <div id="previewWrap"><canvas id="preview"></canvas></div>
+  </section>
+</main>
+<div id="footer">
+  <span id="size" title="Preview and export size (a forced Resolution overrides it)">
+    <input id="pw" type="number" min="1" max="16384" value="1920"> × <input id="ph" type="number" min="1" max="16384" value="1080">
+  </span>
+  <button id="getScreens">Screens…</button>
+  <button id="savePng">Save PNG</button>
+  <button id="saveTif">Save TIF</button>
+  <input id="url" type="text" readonly title="The Web layer URL for the current settings">
+  <button id="copyUrl">Copy URL</button>
+</div>
+<div id="toast"></div>
+<div id="ask" role="dialog" aria-modal="true">
+  <div class="abox">
+    <div id="askTitle"></div>
+    <input id="askInput" type="text" maxlength="64">
+    <div class="arow"><span class="spacer"></span><button id="askCancel">Cancel</button><button id="askOk" class="primary">OK</button></div>
+  </div>
+</div>
+<div id="diag">
+  <div class="dhead"><b>Connection to Designer</b><span class="spacer"></span><button id="diagClose">×</button></div>
+  <pre id="diagLog"></pre>
+  <div class="drow">
+    <input id="diagApi" type="text" placeholder="Designer API address, e.g. localhost:81">
+    <button id="diagRetry" class="primary">Retry</button>
+    <button id="diagCopy">Copy log</button>
+    <button id="diagProbe" title="Dump Designer's Web layer / bookmark property names into the log">Probe</button>
+  </div>
+  <div class="muted">Preview and Save PNG/TIF (as a download) work without a connection.</div>
+</div>
+<script>
+/*@PATTERN@*/
+</script>
+<script>
+(function () {
+  'use strict';
+  var PY_SOURCE = /*@PYSRC@*/'';
+  var VERSION = '@VERSION@';
+  var REG_NAME = 'gus_tp';                // registered fresh each time the window opens
+  var AUTO_NAME = 'gus_testpattern';      // the same code, auto-loaded from this folder
+  var $ = function (id) { return document.getElementById(id); };
+  var SCHEMA = GusTP.SCHEMA, D = GusTP.defaults();
+  var mod = REG_NAME, session = null, info = null;
+  var state = GusTP.defaults(), target = '', layerCache = [], logoImgs = { tl: null, br: null };
+  var inputs = {}, logoSelects = {}, pushTimer = null, pushing = false, pushAgain = false;
+  var store = { get: function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+                set: function (k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
+
+  function toast(msg, ms) {
+    var t = $('toast'); t.textContent = msg; t.classList.add('show');
+    clearTimeout(toast._t); toast._t = setTimeout(function () { t.classList.remove('show'); }, ms || 3000);
+  }
+  // In-window dialogs. Designer's plugin browser can silently block prompt()/confirm().
+  function ask(title, value, isConfirm) {
+    return new Promise(function (resolve) {
+      var box = $('ask'), inp = $('askInput');
+      $('askTitle').textContent = title;
+      box.classList.toggle('confirm', !!isConfirm);
+      inp.value = value || '';
+      box.classList.add('show');
+      setTimeout(function () { if (isConfirm) $('askOk').focus(); else { inp.focus(); inp.select(); } }, 0);
+      function done(v) {
+        box.classList.remove('show');
+        $('askOk').onclick = $('askCancel').onclick = inp.onkeydown = box.onkeydown = null;
+        resolve(v);
+      }
+      $('askOk').onclick = function () { done(isConfirm ? true : inp.value.trim()); };
+      $('askCancel').onclick = function () { done(isConfirm ? false : ''); };
+      box.onkeydown = function (e) {
+        if (e.key === 'Escape') done(isConfirm ? false : '');
+        if (e.key === 'Enter') { e.preventDefault(); done(isConfirm ? true : inp.value.trim()); }
+      };
+    });
+  }
+  function askYes(title) { return ask(title, '', true); }
+  // Designer renders plugin windows off-screen; native <select> pop-ups there can
+  // resize/rescale the whole view. Every <select> is shown as an in-page list instead.
+  var pickers = [];
+  function picker(sel) {
+    if (sel._pick) return sel._pick;
+    var wrap = document.createElement('span'); wrap.className = 'pick';
+    var btn = document.createElement('button'); btn.type = 'button';
+    var lab = document.createElement('span'); btn.appendChild(lab); wrap.appendChild(btn);
+    if (sel.title) btn.title = sel.title;
+    sel.parentNode.insertBefore(wrap, sel); sel.classList.add('picked');
+    function sync() {
+      var o = sel.options[sel.selectedIndex];
+      lab.textContent = o ? o.textContent : '';
+    }
+    btn.onclick = function (e) {
+      e.stopPropagation();
+      var open = document.querySelector('.pick-list');
+      if (open) { var mine = open._owner === sel; open.remove(); if (mine) return; }
+      var list = document.createElement('div'); list.className = 'pick-list'; list._owner = sel;
+      [].forEach.call(sel.options, function (o, i) {
+        var d = document.createElement('div'); d.textContent = o.textContent;
+        if (i === sel.selectedIndex) d.className = 'cur';
+        d.onclick = function (ev) {
+          ev.stopPropagation(); list.remove();
+          if (sel.selectedIndex !== i) { sel.selectedIndex = i; sync(); sel.dispatchEvent(new Event('change')); }
+        };
+        list.appendChild(d);
+      });
+      document.body.appendChild(list);
+      var r = btn.getBoundingClientRect(), lw = Math.max(r.width, 160);
+      list.style.minWidth = lw + 'px';
+      list.style.left = Math.max(4, Math.min(r.left, innerWidth - list.offsetWidth - 4)) + 'px';
+      var below = innerHeight - r.bottom - 8;
+      if (below >= Math.min(list.offsetHeight, 200)) list.style.top = (r.bottom + 2) + 'px';
+      else list.style.top = Math.max(4, r.top - list.offsetHeight - 2) + 'px';
+    };
+    new MutationObserver(sync).observe(sel, { childList: true, subtree: true, characterData: true, attributes: true });
+    // keep the label right when code sets sel.value / selectedIndex directly
+    ['value', 'selectedIndex'].forEach(function (prop) {
+      var d = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, prop);
+      Object.defineProperty(sel, prop, { configurable: true, get: function () { return d.get.call(sel); },
+        set: function (v) { d.set.call(sel, v); sync(); } });
+    });
+    sel._pick = { sync: sync, el: wrap };
+    pickers.push(sel); sync();
+    return sel._pick;
+  }
+  document.addEventListener('click', function () { var o = document.querySelector('.pick-list'); if (o) o.remove(); });
+  window.addEventListener('resize', function () { var o = document.querySelector('.pick-list'); if (o) o.remove(); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { var o = document.querySelector('.pick-list'); if (o) o.remove(); } });
+
+  function status(cls, txt) { $('status').className = 'pill ' + cls; $('statusTxt').textContent = txt; }
+
+  // ---- Designer API ----------------------------------------------------
+  // Usually same origin as this page, but Designer may host plugin pages on
+  // a different port and pass ?director=host:port, so the base is found at boot.
+  var apiBase = '', diagLog = [];
+  function diag(line) { diagLog.push(line); var el = $('diagLog'); if (el) el.textContent = diagLog.join('\n'); }
+  function http(method, path, body, base) {
+    var url = (base === undefined ? apiBase : base) + path;
+    return fetch(url, { method: method, headers: body ? { 'Content-Type': 'application/json' } : {},
+                        body: body ? JSON.stringify(body) : undefined })
+      .then(function (r) {
+        return r.text().then(function (t) {
+          if (!r.ok) {
+            diag('✗ HTTP ' + r.status + ' ' + path + '\n' + (t || '').slice(0, 3000));
+            var m = ''; try { var j = JSON.parse(t); m = (j.status && j.status.message) || ''; } catch (e) {}
+            throw new Error('HTTP ' + r.status + ' from ' + path + (m ? ' — ' + m.replace(/\s+/g, ' ').slice(0, 300) : t ? ' — ' + t.replace(/\s+/g, ' ').slice(0, 160) : ''));
+          }
+          try { return JSON.parse(t); } catch (e) { throw new Error('not JSON from ' + url + ': ' + t.replace(/\s+/g, ' ').slice(0, 120)); }
+        });
+      }, function (e) { throw new Error('no response from ' + url + ' (' + e.message + ')'); });
+  }
+  function normBase(s) {
+    s = (s || '').trim().replace(/\/+$/, '');
+    if (!s) return '';
+    return /^https?:\/\//.test(s) ? s : 'http://' + s;
+  }
+  function candidateBases() {
+    var qs = new URLSearchParams(location.search), out = [];
+    ['director', 'd3', 'host'].forEach(function (k) { if (qs.get(k)) out.push(normBase(qs.get(k))); });
+    if (store.get('tp.api')) out.push(normBase(store.get('tp.api')));
+    if (/^https?:$/.test(location.protocol)) out.push('');
+    var h = /^https?:$/.test(location.protocol) ? location.hostname : 'localhost';
+    [80, 81, 8080].forEach(function (p) { out.push('http://' + h + (p === 80 ? '' : ':' + p)); });
+    return out.filter(function (b, i) { return out.indexOf(b) === i; });
+  }
+  function findApi(list) {
+    if (!list.length) return Promise.reject(new Error('Designer\'s API not found at any address tried'));
+    var b = list[0];
+    return http('GET', '/api/session/status/session', undefined, b).then(function (s) {
+      diag('✓ API at ' + (b || location.origin + ' (same origin)'));
+      apiBase = b; session = s;
+    }, function (e) { diag('✗ ' + e.message); return findApi(list.slice(1)); });
+  }
+  function pyArg(v) { return typeof v === 'number' ? String(v) : (v === true ? 'True' : v === false ? 'False' : 'u' + JSON.stringify(String(v))); }
+  function call(fn) {
+    var args = [].slice.call(arguments, 1).map(pyArg).join(', ');
+    return http('POST', '/api/session/python/execute', { moduleName: mod, script: 'return ' + fn + '(' + args + ')' })
+      .then(function (r) {
+        // Designer json-serialises whatever the script returns, and the helper
+        // itself returns JSON text, so the value can arrive encoded twice.
+        var rv = r.returnValue;
+        for (var i = 0; i < 3 && typeof rv === 'string'; i++) { try { rv = JSON.parse(rv); } catch (e) { break; } }
+        if (rv && typeof rv === 'object') return rv;
+        diag('  raw returnValue: ' + JSON.stringify(r.returnValue).slice(0, 200));
+        var log = (r.pythonLog || r.d3Log || '').toString().trim();
+        var msg = r.status && (r.status.message || r.status.details);
+        throw new Error([fn + '() in module ' + mod + ' gave no result', msg, log,
+                         'status ' + JSON.stringify(r.status)].filter(Boolean).join(' | '));
+      });
+  }
+
+  // ---- URL <-> state ------------------------------------------------------
+  // Designer zooms each Web layer's browser to fit the layer, and the embedded
+  // browser remembers zoom per host. If the layer loaded from the same host as
+  // this window, that zoom would leak in here (seen in Designer r32.4, v2.8.0).
+  // So: solo session -> layers use 127.0.0.1, this window keeps its own host.
+  function outBase() {
+    var u = new URL('out.html', location.href);
+    var solo = !session || session.isRunningSolo !== false;
+    if (solo) {
+      if (!/^(127\.0\.0\.1|\[::1\])$/.test(location.hostname)) u.hostname = '127.0.0.1';
+      else u.hostname = 'localhost';
+    } else if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(u.hostname) && session.director && session.director.hostname) {
+      u.hostname = session.director.hostname;      // other machines must reach this one
+    }
+    u.hash = ''; u.search = '';
+    return u.href.replace(/#$/, '');
+  }
+  function encode(s, name) {
+    var p = new URLSearchParams();
+    if (name) p.set('name', name);
+    Object.keys(SCHEMA).forEach(function (k) { if (s[k] !== D[k]) p.set(k, String(s[k])); });
+    return outBase() + '#' + p.toString();
+  }
+  function decode(url) {
+    var i = (url || '').indexOf('#'), o = {};
+    if (i < 0) return null;
+    new URLSearchParams(url.slice(i + 1)).forEach(function (v, k) { o[k] = v; });
+    return GusTP.sanitise(o);
+  }
+  function currentUrl() { return encode(state, target || state.labelText || ''); }
+
+  // ---- controls --------------------------------------------------------
+  function buildControls() {
+    var groups = {}, order = [], root = $('controls');
+    Object.keys(SCHEMA).forEach(function (k) {
+      var g = SCHEMA[k][5];
+      if (!groups[g]) { groups[g] = []; order.push(g); }
+      groups[g].push(k);
+    });
+    order.forEach(function (g, gi) {
+      var d = document.createElement('details');
+      d.open = gi < 3 || g === 'Input transform';
+      if (g === 'LED wall') d.dataset.group = 'led';
+      d.innerHTML = '<summary>' + g + '</summary>';
+      groups[g].forEach(function (k) { d.appendChild(row(k)); });
+      if (g === 'LED wall') {
+        var wn = document.createElement('div'); wn.className = 'note'; wn.id = 'wallNote';
+        d.appendChild(wn);
+      }
+      if (g === 'Logos') {
+        var n = document.createElement('div'); n.className = 'note';
+        n.textContent = 'Put PNG/JPEG/SVG files in this plugin\'s logos folder, then press ↻.';
+        d.appendChild(n);
+      }
+      root.appendChild(d);
+    });
+  }
+
+  function row(k) {
+    var spec = SCHEMA[k], t = spec[0], r = document.createElement('div');
+    r.className = 'row'; r.dataset.key = k;
+    var lab = document.createElement('label'); lab.textContent = spec[4];
+    lab.title = 'Double-click to reset'; lab.ondblclick = function () { set(k, spec[1]); };
+    r.appendChild(lab);
+    if (k === 'logoTLFile' || k === 'logoBRFile') {
+      r.classList.add('wide');
+      var sel = document.createElement('select');
+      sel.onchange = function () { set(k, sel.value); };
+      r.appendChild(sel);
+      picker(sel);
+      logoSelects[k] = sel;
+      inputs[k] = { set: function (v) {
+        if (v && ![].some.call(sel.options, function (o) { return o.value === v; })) addOpt(sel, v, v + ' (missing?)');
+        sel.value = v;
+      } };
+    } else if (t === 'enum' && (spec[6].length > 3 || spec[6].join('').length > 16)) {
+      // long option lists: in-page dropdown (Designer's window can't host a native <select>)
+      r.classList.add('wide');
+      var es = document.createElement('select');
+      spec[6].forEach(function (name, i) { addOpt(es, String(i), name); });
+      es.onchange = function () { set(k, Number(es.value)); };
+      r.appendChild(es);
+      picker(es);
+      inputs[k] = { set: function (v) { es.value = String(v); } };
+    } else if (t === 'enum' || t === 'bool') {
+      r.classList.add('wide');
+      var seg = document.createElement('span'); seg.className = 'seg';
+      (t === 'bool' ? ['No', 'Yes'] : spec[6]).forEach(function (name, i) {
+        var b = document.createElement('button'); b.textContent = name;
+        b.onclick = function () { set(k, i); };
+        seg.appendChild(b);
+      });
+      r.appendChild(seg);
+      inputs[k] = { set: function (v) { [].forEach.call(seg.children, function (b, i) { b.classList.toggle('sel', i === v); }); } };
+    } else if (t === 'colour') {
+      r.classList.add('wide');
+      var c = document.createElement('input'); c.type = 'color';
+      c.oninput = function () { set(k, c.value); };
+      r.appendChild(c);
+      inputs[k] = { set: function (v) { c.value = v; } };
+    } else if (t === 'str') {
+      r.classList.add('wide');
+      var s = document.createElement('input'); s.type = 'text'; s.maxLength = spec[3];
+      s.oninput = function () { set(k, s.value); };
+      r.appendChild(s);
+      inputs[k] = { set: function (v) { if (document.activeElement !== s) s.value = v; } };
+    } else {
+      var isInt = t === 'int', lo = spec[2], hi = spec[3];
+      var shi = { gridSpacing: 1000, subGridSpacing: 500, gridThickness: 32, subGridThickness: 32,
+                  borderThickness: 32, circleThickness: 32, resW: 7680, resH: 4320,
+                  tileW: 1024, tileH: 1024, tilesX: 64, tilesY: 64, tileOutline: 16, portTiles: 64 }[k] || hi;
+      var sl = document.createElement('input'); sl.type = 'range';
+      sl.min = lo; sl.max = shi; sl.step = isInt ? 1 : (hi - lo <= 2.5 ? 0.01 : 0.05);
+      var nb = document.createElement('input'); nb.type = 'number';
+      nb.min = lo; nb.max = hi; nb.step = sl.step;
+      sl.oninput = function () { set(k, Number(sl.value)); };
+      nb.onchange = function () { set(k, Number(nb.value)); };
+      nb.onkeydown = function (e) {
+        if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+        e.preventDefault();
+        var st = Number(sl.step) * (e.shiftKey ? 10 : 1) * (e.key === 'ArrowUp' ? 1 : -1);
+        set(k, Math.round((state[k] + st) * 1000) / 1000);
+      };
+      r.appendChild(sl); r.appendChild(nb);
+      inputs[k] = { set: function (v) { sl.value = v; if (document.activeElement !== nb) nb.value = isInt ? v : (+v).toFixed(2); } };
+    }
+    return r;
+  }
+
+  function addOpt(sel, value, text) {
+    var o = document.createElement('option'); o.value = value; o.textContent = text || value; sel.appendChild(o);
+  }
+
+  function refreshInputs() {
+    Object.keys(inputs).forEach(function (k) {
+      inputs[k].set(state[k]);
+      var r = document.querySelector('.row[data-key="' + k + '"]');
+      if (r) r.classList.toggle('changed', state[k] !== D[k]);
+    });
+    $('url').value = currentUrl();
+    var wn = $('wallNote');
+    if (wn) {
+      var ws = GusTP.wallSize(state), rows = state.tilesY + (state.halfTile ? 0.5 : 0);
+      wn.textContent = (state.ledWall ? 'Wall: ' : 'Off. Wall would be: ') + ws[0] + ' × ' + ws[1] + ' px · ' +
+        state.tilesX + ' × ' + rows + ' tiles (' + (state.tilesX * (state.tilesY + (state.halfTile ? 1 : 0))) + ' panels' +
+        (state.halfTile ? ', ' + state.tilesX + ' half' : '') + ')' +
+        (state.portTiles > 0 ? ' · ' + Math.ceil(state.tilesX * (state.tilesY + (state.halfTile ? 1 : 0)) / state.portTiles) + ' ports' : '') +
+        (state.ledWall ? '. Overrides Resolution; set the layer mapping to this size.' : '');
+    }
+    document.querySelectorAll('.row[data-key]').forEach(function (r) {
+      var k = r.dataset.key;
+      if (SCHEMA[k][5] === 'LED wall' && k !== 'ledWall') r.classList.toggle('dim', !state.ledWall);
+    });
+  }
+
+  function set(k, v) {
+    var p = {}; p[k] = v;
+    // switching LED wall on: clear the pixel-grid furniture so the tiles read cleanly
+    // (each can be turned back on afterwards)
+    if (k === 'ledWall' && v && !state.ledWall) { p.gridMode = 0; p.circles = 0; p.centreCross = 0; p.diagonals = 0; }
+    state = GusTP.sanitise(p, state);
+    if (k === 'logoTLFile' || k === 'logoBRFile') loadLogos();
+    refreshInputs(); drawPreview(); queuePush();
+  }
+
+  function replaceState(s) { state = GusTP.sanitise(s); loadLogos(); refreshInputs(); drawPreview(); }
+
+  // ---- live push: rewrite the Web layer's URL, ~6 times a second max ---
+  function queuePush() {
+    store.set('tp.last', JSON.stringify(state));
+    if (!target || !$('live').checked) return;
+    if (pushing) { pushAgain = true; return; }
+    if (pushTimer) return;
+    pushTimer = setTimeout(push, 160);
+  }
+  function push() {
+    pushTimer = null;
+    if (!target) return;
+    pushing = true;
+    var t0 = performance.now();
+    call('set_url', target, currentUrl()).then(function (r) {
+      if (r.ok) status('on', 'LIVE → ' + target + ' · ' + Math.round(performance.now() - t0) + ' ms');
+      else { diag('✗ set_url: ' + JSON.stringify(r).slice(0, 300)); status('err', 'not applied'); toast('Couldn\'t update "' + target + '": ' + r.error +
+              '\nCopy URL and paste it into the layer instead.', 7000); $('live').checked = false; }
+    }).catch(function (e) { status('err', 'Designer error'); toast(e.message, 6000); })
+      .then(function () { pushing = false; if (pushAgain) { pushAgain = false; queuePush(); } });
+  }
+
+  // ---- preview / export ------------------------------------------------
+  function outSize() {
+    return GusTP.outputSize(state, Number($('pw').value) || 1920, Number($('ph').value) || 1080);
+  }
+  function loadLogos() {
+    [['tl', 'logoTLFile'], ['br', 'logoBRFile']].forEach(function (p) {
+      var f = state[p[1]];
+      if (!f) { logoImgs[p[0]] = null; return; }
+      var img = new Image();
+      img.onload = function () { if (state[p[1]] === f) { logoImgs[p[0]] = img; drawPreview(); } };
+      img.onerror = function () { if (state[p[1]] === f) logoImgs[p[0]] = null; };
+      img.src = new URL('logos/' + encodeURIComponent(f), location.href).href;
+    });
+  }
+  function renderTo(c, w, h) {
+    if (c.width !== w) c.width = w;
+    if (c.height !== h) c.height = h;
+    GusTP.render(c.getContext('2d'), w, h, state, { channel: target || '', logoTL: logoImgs.tl, logoBR: logoImgs.br });
+  }
+  var previewPending = false;
+  function drawPreview() {
+    if (previewPending) return;
+    previewPending = true;
+    requestAnimationFrame(function () {
+      previewPending = false;
+      var s = outSize();
+      renderTo($('preview'), s[0], s[1]);
+      $('preview').title = s[0] + ' × ' + s[1];
+    });
+  }
+
+  function b64(bytes) {
+    var s = '', CH = 0x8000;
+    for (var i = 0; i < bytes.length; i += CH) s += String.fromCharCode.apply(null, bytes.subarray(i, i + CH));
+    return btoa(s);
+  }
+
+  // Baseline RGB TIFF, Deflate-compressed when the browser can, else raw.
+  function tiff(canvas) {
+    var w = canvas.width, h = canvas.height;
+    var px = canvas.getContext('2d').getImageData(0, 0, w, h).data;
+    var rgb = new Uint8Array(w * h * 3);
+    for (var i = 0, j = 0; i < px.length; i += 4) { rgb[j++] = px[i]; rgb[j++] = px[i + 1]; rgb[j++] = px[i + 2]; }
+    var packed = window.CompressionStream
+      ? new Response(new Blob([rgb]).stream().pipeThrough(new CompressionStream('deflate'))).arrayBuffer()
+          .then(function (b) { return { data: new Uint8Array(b), comp: 8 }; })
+      : Promise.resolve({ data: rgb, comp: 1 });
+    return packed.then(function (p) {
+      var tags = [[256, 4, 1, w], [257, 4, 1, h], [258, 3, 3, 'bps'], [259, 3, 1, p.comp], [262, 3, 1, 2],
+                  [273, 4, 1, 'off'], [277, 3, 1, 3], [278, 4, 1, h], [279, 4, 1, p.data.length],
+                  [282, 5, 1, 'xres'], [283, 5, 1, 'yres'], [284, 3, 1, 1], [296, 3, 1, 2]];
+      var ifd = 8, ifdLen = 2 + tags.length * 12 + 4, extra = ifd + ifdLen;
+      var bpsOff = extra, xresOff = bpsOff + 6, yresOff = xresOff + 8, dataOff = yresOff + 8;
+      var buf = new ArrayBuffer(dataOff + p.data.length), dv = new DataView(buf);
+      dv.setUint16(0, 0x4949); dv.setUint16(2, 42, true); dv.setUint32(4, ifd, true);
+      dv.setUint16(ifd, tags.length, true);
+      tags.forEach(function (t, n) {
+        var o = ifd + 2 + n * 12, v = t[3];
+        dv.setUint16(o, t[0], true); dv.setUint16(o + 2, t[1], true); dv.setUint32(o + 4, t[2], true);
+        if (v === 'bps') v = bpsOff; else if (v === 'off') v = dataOff;
+        else if (v === 'xres') v = xresOff; else if (v === 'yres') v = yresOff;
+        if (t[1] === 3 && t[2] === 1) dv.setUint16(o + 8, v, true); else dv.setUint32(o + 8, v, true);
+      });
+      dv.setUint32(ifd + 2 + tags.length * 12, 0, true);
+      for (var b = 0; b < 3; b++) dv.setUint16(bpsOff + b * 2, 8, true);
+      dv.setUint32(xresOff, 72, true); dv.setUint32(xresOff + 4, 1, true);
+      dv.setUint32(yresOff, 72, true); dv.setUint32(yresOff + 4, 1, true);
+      new Uint8Array(buf, dataOff).set(p.data);
+      return new Uint8Array(buf);
+    });
+  }
+
+  function download(bytes, name, type) {
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([bytes], { type: type }));
+    a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
+  }
+
+  function save(kind) {
+    var s = outSize(), c = document.createElement('canvas');
+    renderTo(c, s[0], s[1]);
+    var base = (state.labelText || target || 'test pattern').replace(/[^A-Za-z0-9 _\-]/g, '_').trim() || 'test pattern';
+    var name = base + '_' + s[0] + 'x' + s[1] + (kind === 'tif' ? '.tif' : '.png');
+    var bytesP = kind === 'tif' ? tiff(c)
+      : new Promise(function (res) { c.toBlob(function (b) { b.arrayBuffer().then(function (a) { res(new Uint8Array(a)); }); }, 'image/png'); });
+    status('', 'encoding ' + name + '…');
+    bytesP.then(function (bytes) {
+      var dir = info && info.exportDir;
+      if (!dir) { download(bytes, name, kind === 'tif' ? 'image/tiff' : 'image/png'); status('', 'downloaded ' + name); return; }
+      var sep = dir.indexOf('\\') >= 0 ? '\\' : '/', path = dir + sep + name;
+      var data = b64(bytes), CH = 384 * 1024, n = Math.ceil(data.length / CH), i = 0;
+      function next() {
+        status('', 'writing ' + name + ' ' + Math.round(i / n * 100) + '%');
+        return call('write_chunk', path, data.slice(i * CH, (i + 1) * CH), i === 0).then(function (r) {
+          if (!r.ok) throw new Error(r.error);
+          i++;
+          if (i < n) return next();
+          status('on', 'saved ' + name);
+          toast('Saved into the project:\n' + r.path + '\n(' + Math.round(r.size / 1024) + ' KB). It appears in Designer\'s media list.', 6000);
+        });
+      }
+      return next().catch(function (e) {
+        toast('Couldn\'t write into the project (' + e.message + ').\nDownloading instead.', 6000);
+        download(bytes, name, kind === 'tif' ? 'image/tiff' : 'image/png');
+      });
+    });
+  }
+
+  // ---- layers ------------------------------------------------------------
+  // Layers made before v2.9.0 point at this window's own host; Designer's per-host
+  // zoom for those layers leaks into this window (and the Plugin Launcher).
+  // Move every Test Pattern+ layer to the separate host, once per connection.
+  var migrated = false;
+  function migrate(layers) {
+    if (migrated) return Promise.resolve();
+    migrated = true;
+    var base = outBase(), todo = layers.filter(function (l) {
+      return l.url && /gus_testpattern\/out\.html/.test(l.url) && l.url.split('#')[0] !== base;
+    });
+    if (!todo.length) { diag('✓ all Test Pattern+ layers already on ' + new URL(base).host); return Promise.resolve(); }
+    return todo.reduce(function (p, l) {
+      return p.then(function () {
+        var url = base + (l.url.indexOf('#') >= 0 ? l.url.slice(l.url.indexOf('#')) : '');
+        return call('set_url', l.name, url).then(function (r) {
+          diag((r.ok ? '✓ moved ' : '✗ could not move ') + l.name + ' → ' + new URL(base).host + (r.ok ? '' : ': ' + r.error));
+          if (r.ok) l.url = url;
+        });
+      });
+    }, Promise.resolve());
+  }
+
+  function refreshLayers(select) {
+    return call('web_layers').then(function (r) {
+      layerCache = r.layers || [];
+      return migrate(layerCache).then(function () { return r; });
+    }).then(function (r) {
+      var sel = $('target'); sel.innerHTML = '';
+      addOpt(sel, '', '— preview / export only —');
+      layerCache.forEach(function (l) { addOpt(sel, l.name, l.name); });
+      if (select !== undefined) target = select;
+      if (target && !layerCache.some(function (l) { return l.name === target; })) target = '';
+      sel.value = target;
+      return call('list_logos');
+    }).then(function (r) {
+      ['logoTLFile', 'logoBRFile'].forEach(function (k) {
+        var sel = logoSelects[k]; sel.innerHTML = '';
+        addOpt(sel, '', 'none');
+        (r.logos || []).forEach(function (f) { addOpt(sel, f); });
+        sel.value = state[k];
+      });
+      refreshInputs();
+    }).catch(function (e) { status('err', 'Designer error'); toast(e.message, 6000); });
+  }
+
+  function adoptLayer(name) {
+    target = name;
+    var l = layerCache.filter(function (x) { return x.name === name; })[0];
+    var s = l && decode(l.url);
+    if (s) replaceState(s);              // the layer remembers its own pattern
+    else { refreshInputs(); queuePush(); }
+    status(target ? 'on' : '', target ? 'driving ' + target : 'preview only');
+  }
+
+  // ---- wiring ------------------------------------------------------------
+  $('target').onchange = function () { adoptLayer(this.value); };
+  $('refresh').onclick = function () { refreshLayers(); };
+  $('live').onchange = function () { if (this.checked) queuePush(); };
+  $('pw').onchange = $('ph').onchange = function () { store.set('tp.size', $('pw').value + 'x' + $('ph').value); drawPreview(); };
+  $('newLayer').onclick = function () {
+    if (!info) { toast('Not connected to Designer yet. Click the status pill for details.', 5000); return; }
+    ask('Name for the new Web layer:', 'TP ' + (state.labelText || 'Main')).then(function (n) {
+      if (!n) return;
+      var layer = n, notes = [];
+      function step(label, fn) {
+        var args = [].slice.call(arguments, 2);
+        diag('→ ' + fn + '(' + args.map(function (a) { return JSON.stringify(a).slice(0, 60); }).join(', ') + ')');
+        return call.apply(null, [fn].concat(args)).then(function (r) {
+          diag((r.ok ? '✓ ' : '✗ ') + fn + ': ' + JSON.stringify(r).slice(0, 1500));
+          return r;
+        });
+      }
+      status('', 'creating layer…');
+      return step('layer', 'add_layer', n, 30).then(function (r) {
+        if (!r.ok) throw new Error('layer not created: ' + r.error);
+        layer = r.layer;
+        status('', 'creating bookmark…');
+        return step('bookmark', 'make_bookmark', layer, encode(state, layer));
+      }).then(function (r) {
+        if (!r.ok) { notes.push('bookmark: ' + r.error); return null; }
+        status('', 'attaching bookmark…');
+        return step('attach', 'attach_bookmark', layer, r.path).then(function (a) {
+          if (!a.ok) notes.push('attach: ' + a.error);
+          return a.ok ? r : null;
+        });
+      }).then(function (bm) {
+        if (bm) {
+          toast('Web layer "' + layer + '" (30 s) added at the playhead with bookmark "' + bm.bookmark +
+                '".\nAssign its mapping in Designer.', 6000);
+          return;
+        }
+        // fall back to a plain URL field, if this Designer has one
+        return step('url', 'set_url_field', layer, encode(state, layer)).then(function (u) {
+          if (u.ok) toast('Web layer "' + layer + '" added; URL put in its "' + u.field + '" field.', 7000);
+          else {
+            toast('Web layer "' + layer + '" added, but the URL couldn\'t be set.\n' + notes.join('\n') +
+                  '\nPress Probe in the connection panel and send me the result.', 14000);
+            $('diag').classList.add('show');
+          }
+        });
+      }).then(function () { return refreshLayers(layer); })
+        .then(function () { adoptLayer(layer); })
+        .catch(function (e) {
+          status('err', 'layer not created');
+          toast('New Web layer failed: ' + e.message + '\nThe connection panel has the full log.', 12000);
+          $('diag').classList.add('show');
+        });
+    });
+  };
+  $('reset').onclick = function () {
+    askYes('Reset all settings to defaults?').then(function (ok) { if (ok) { replaceState({}); queuePush(); } });
+  };
+  $('copyUrl').onclick = function () {
+    var u = $('url'); u.select();
+    (navigator.clipboard ? navigator.clipboard.writeText(u.value) : Promise.reject())
+      .catch(function () { document.execCommand('copy'); })
+      .then(function () { toast('Copied. Paste into a Web layer\'s URL.'); });
+  };
+  $('savePng').onclick = function () { save('png'); };
+  $('saveTif').onclick = function () { save('tif'); };
+  $('getScreens').onclick = function () {
+    var box = $('screens');
+    if (box.classList.contains('show')) return box.classList.remove('show');
+    call('screens').then(function (r) {
+      var list = r.screens || [];
+      box.innerHTML = list.length ? '' : '<div class="s muted">No screens found.</div>';
+      list.forEach(function (s) {
+        var d = document.createElement('div'); d.className = 's';
+        d.innerHTML = '<span></span><span class="muted"></span>';
+        d.children[0].textContent = s.name; d.children[1].textContent = s.w && s.h ? s.w + ' × ' + s.h : '?';
+        d.onclick = function () {
+          box.classList.remove('show');
+          if (s.w && s.h) { $('pw').value = s.w; $('ph').value = s.h; store.set('tp.size', s.w + 'x' + s.h); }
+          set('labelText', s.name);
+        };
+        box.appendChild(d);
+      });
+      box.classList.add('show');
+    }).catch(function (e) { toast('Screens: ' + e.message); });
+  };
+
+  function presets() { try { return JSON.parse(store.get('tp.presets') || '{}'); } catch (e) { return {}; } }
+  function fillPresets() {
+    var sel = $('presetSel'), p = presets(); sel.length = 1;
+    Object.keys(p).sort().forEach(function (n) { addOpt(sel, n); });
+  }
+  $('presetSel').onchange = function () {
+    var p = presets()[this.value]; this.value = '';
+    if (!p) return;
+    replaceState(Object.assign({}, p, { labelText: state.labelText, resW: state.resW, resH: state.resH }));
+    queuePush();
+  };
+  $('presetSave').onclick = function () {
+    ask('Preset name:', '').then(function (n) {
+      if (!n) return;
+      var p = presets(); p[n] = state; store.set('tp.presets', JSON.stringify(p)); fillPresets();
+      toast('Saved preset "' + n + '" (stored in this plugin window).');
+    });
+  };
+
+  // ---- view log: record size / scale changes (diagnostics only) ---------
+  var lastView = '';
+  function viewLog() {
+    var v = innerWidth + '×' + innerHeight + ' · dpr ' + (window.devicePixelRatio || 1).toFixed(3);
+    if (v !== lastView) { lastView = v; diag('view ' + v); }
+  }
+  window.addEventListener('resize', viewLog);
+  setInterval(viewLog, 1000);
+
+  // ---- boot: register helper, then read Designer -----------------------
+  buildControls();
+  picker($('target')); picker($('presetSel'));
+  var sz = (store.get('tp.size') || '').split('x');
+  if (sz.length === 2 && +sz[0] && +sz[1]) { $('pw').value = sz[0]; $('ph').value = sz[1]; }
+  try { replaceState(JSON.parse(store.get('tp.last') || '{}')); } catch (e) { replaceState({}); }
+  fillPresets();
+
+  function connect(extra) {
+    diagLog = []; diag('Test Pattern+ v' + VERSION + ' · page: ' + location.href);
+    status('', 'connecting…');
+    var list = (extra ? [normBase(extra)] : []).concat(candidateBases());
+    return findApi(list)
+      .then(function () {
+        return http('POST', '/api/session/python/registermodule', { moduleName: REG_NAME, contents: PY_SOURCE })
+          .then(function (r) {
+            var code = r && r.status && r.status.code;
+            if (code) throw new Error('registermodule status ' + JSON.stringify(r.status));
+            mod = REG_NAME; diag('✓ registered helper as ' + REG_NAME);
+          }, function (e) { throw e; })
+          .catch(function (e) { diag('✗ register: ' + e.message + ' → trying auto-loaded ' + AUTO_NAME); mod = AUTO_NAME; });
+      })
+      .then(function () {
+        return call('info').catch(function (e) {
+          diag('✗ info() via ' + mod + ': ' + e.message);
+          if (mod === AUTO_NAME) throw e;
+          mod = AUTO_NAME; return call('info');
+        });
+      })
+      .then(function (r) {
+        info = r; diag('✓ info() via ' + mod + ' (helper v' + (r.version || '?') + ') · project: ' + (r.project || '?'));
+        if (r.version !== VERSION) {
+          $('ver').classList.add('stale');
+          $('ver').title = 'Window v' + VERSION + ' but Designer is running helper v' + (r.version || 'unknown') + ' — reopen the window, or restart Designer if it persists';
+          diag('! version mismatch: window v' + VERSION + ', helper v' + (r.version || 'unknown'));
+        }
+        if (apiBase) store.set('tp.api', apiBase);
+        $('diag').classList.remove('show');
+        status('', 'connected'); return refreshLayers();
+      })
+      .catch(function (e) {
+        diag('✗ ' + e.message);
+        status('err', 'Designer not reachable');
+        $('diag').classList.add('show');
+      })
+      .then(function () { refreshInputs(); drawPreview(); });
+  }
+  $('diagRetry').onclick = function () { connect($('diagApi').value); };
+  $('diagCopy').onclick = function () {
+    var t = diagLog.join('\n');
+    (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(function () { toast('Log copied.'); },
+      function () { var r = document.createRange(); r.selectNodeContents($('diagLog')); getSelection().removeAllRanges(); getSelection().addRange(r); });
+  };
+  $('diagProbe').onclick = function () {
+    diag('→ probe()');
+    call('probe').then(function (r) { diag('PROBE ' + JSON.stringify(r, null, 1)); toast('Probe done. Copy log and send it over.'); })
+      .catch(function (e) { diag('✗ probe: ' + e.message); });
+  };
+  $('diagClose').onclick = function () { $('diag').classList.remove('show'); };
+  $('status').onclick = function () { $('diag').classList.toggle('show'); };
+  connect();
+  viewLog();
+})();
+</script>
+</body>
+</html>
