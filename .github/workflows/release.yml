@@ -1,5 +1,5 @@
 # Push a tag like v0.9.20 and this builds the plugin and publishes a GitHub Release
-# with gus_testpattern-<version>.zip attached. The tag must match VERSION in build.py.
+# with testpattern-plus-<version>.zip attached. The tag must match VERSION in build.py.
 name: Release
 
 on:
@@ -37,5 +37,5 @@ jobs:
           body_path: dist/RELEASE_NOTES.md
           generate_release_notes: true
           prerelease: ${{ startsWith(env.VERSION, '0.') }}
-          files: dist/gus_testpattern-${{ env.VERSION }}.zip
+          files: dist/testpattern-plus-${{ env.VERSION }}.zip
           fail_on_unmatched_files: true

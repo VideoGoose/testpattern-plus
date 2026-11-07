@@ -4,7 +4,7 @@
     python build.py                             # build only
     python build.py --install "<plugins dir>"   # build, copy into a Designer project's plugins
                                                 # folder, and byte-check the copy
-    python build.py --zip                       # build + dist/gus_testpattern-<version>.zip and
+    python build.py --zip                       # build + dist/testpattern-plus-<version>.zip and
                                                 # dist/RELEASE_NOTES.md (used by the GitHub release)
 """
 import filecmp
@@ -17,6 +17,7 @@ import zipfile
 HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.join(HERE, 'src')
 PLUGIN = 'gus_testpattern'      # folder name Designer loads; designer.py finds itself by it
+ZIP_NAME = 'testpattern-plus'   # release download: testpattern-plus-<version>.zip (folder inside stays PLUGIN)
 OUT = os.path.join(HERE, 'dist', PLUGIN)
 VERSION = '0.9.20'   # 0.9.xx: bump the last number on every change you install
 # replaced on every install / update. The user's own files (logos/, presets/,
@@ -108,8 +109,8 @@ def install(plugins_dir):
 
 
 def make_zip():
-    """dist/gus_testpattern-<v>.zip: the plugin folder itself at the top, ready to unzip into plugins/."""
-    path = os.path.join(HERE, 'dist', '%s-%s.zip' % (PLUGIN, VERSION))
+    """dist/testpattern-plus-<v>.zip: the gus_testpattern folder itself at the top, ready to unzip into plugins/."""
+    path = os.path.join(HERE, 'dist', '%s-%s.zip' % (ZIP_NAME, VERSION))
     with zipfile.ZipFile(path, 'w', zipfile.ZIP_DEFLATED) as z:
         for root, dirs, names in os.walk(OUT):
             dirs.sort()
@@ -127,7 +128,7 @@ def make_zip():
                 '3. In Designer open **Plugins → Plugin Launcher → Test Pattern+**. After an update, close the '
                 'plugin window and open it again.\n\n'
                 'Updating replaces only the plugin\'s own files: your `logos`, `presets` and '
-                '`my_led_products.csv` are never in the zip.\n' % (PLUGIN, VERSION))
+                '`my_led_products.csv` are never in the zip.\n' % (ZIP_NAME, VERSION))
     print('zipped ->', path, '(%d KB)' % (os.path.getsize(path) // 1024))
 
 

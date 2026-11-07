@@ -18,7 +18,7 @@ is git-ignored. Keep names, user paths and e-mail addresses out of tracked files
   `CLAUDE.local.md`). Copies the plugin files in `FILES` (incl. `led_products.csv`, `README.txt`),
   byte-checks them, leaves `logos/`, `presets/` and `my_led_products.csv` alone. The user must
   **close and reopen the plugin window** from Plugins → Plugin Launcher to load a new version.
-- Release: `python build.py --zip` → `dist/gus_testpattern-<v>.zip` (plugin folder at the top) +
+- Release: `python build.py --zip` → `dist/testpattern-plus-<v>.zip` (the `gus_testpattern` folder at the top; that folder name must not change) +
   `dist/RELEASE_NOTES.md`. Pushing a tag `v<VERSION>` runs `.github/workflows/release.yml`, which
   checks the tag against `build.py`, builds the zip and publishes a GitHub Release (pre-release
   while the version is 0.x).
