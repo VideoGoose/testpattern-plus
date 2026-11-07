@@ -1,0 +1,41 @@
+# Push a tag like v0.9.20 and this builds the plugin and publishes a GitHub Release
+# with gus_testpattern-<version>.zip attached. The tag must match VERSION in build.py.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Check the tag matches build.py
+        run: |
+          v=$(python -c "import re; print(re.search(r\"VERSION = '([^']+)'\", open('build.py').read()).group(1))")
+          if [ "v$v" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match VERSION $v in build.py"; exit 1
+          fi
+          echo "VERSION=$v" >> "$GITHUB_ENV"
+
+      - name: Build the plugin zip
+        run: python build.py --zip
+
+      - name: Publish the release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Test Pattern+ ${{ env.VERSION }}
+          body_path: dist/RELEASE_NOTES.md
+          generate_release_notes: true
+          prerelease: ${{ startsWith(env.VERSION, '0.') }}
+          files: dist/gus_testpattern-${{ env.VERSION }}.zip
+          fail_on_unmatched_files: true

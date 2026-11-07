@@ -91,6 +91,7 @@ await ui.evaluate(() => document.querySelectorAll("details").forEach(d => d.open
 const visible = () => ui.evaluate(() => [...document.querySelectorAll(".pick-list > div")].filter(d => d.style.display !== "none").map(d => d.textContent));
 await ui.click('.row[data-key="ledProduct"] .pick > button');
 res.search = { focused: await ui.evaluate(() => document.activeElement.className), all: (await visible()).length };
+res.search.mine = (await visible()).filter(t => t.startsWith("★"));
 await ui.keyboard.type("diamond");
 res.search.diamond = await visible();
 await ui.fill(".pick-search", "160x320"); await ui.dispatchEvent(".pick-search", "input");

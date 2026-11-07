@@ -53,6 +53,12 @@ def main():
         plug = os.path.join(proj, 'plugins', 'gus_testpattern')
         shutil.copytree(os.path.join(ROOT, 'dist', 'gus_testpattern'), plug)
         red_png(os.path.join(plug, 'logos', 'red.png'))
+        # a user's own product list, the way Excel saves it (BOM, CRLF): one new product and
+        # one override of a built-in (same name, different notes)
+        with open(os.path.join(plug, 'my_led_products.csv'), 'w', encoding='utf-8-sig', newline='\r\n') as f:
+            f.write('manufacturer,product,pitch_mm,tile_w_mm,tile_h_mm,tile_w_px,tile_h_px,modules_across,modules_down,half_modules_down,notes\n'
+                    'Test Maker,Panel X,3.9,500,1000,128,256,4,4,,my own panel\n'
+                    'ROE,Carbon CB3,3.75,600,1200,160,320,2,8,4,my override\n')
         port = 8790 + i
         mock = subprocess.Popen([sys.executable, os.path.join(HERE, 'mock_designer.py'), proj, str(port)])
         try:

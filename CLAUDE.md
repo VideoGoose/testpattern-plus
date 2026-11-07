@@ -4,6 +4,9 @@ Test pattern generator for disguise Designer at parity with Designer's TestPatte
 per-element line thickness, live adjustment on stage, PNG/TIF export and an LED wall mode.
 No bridge: everything runs from the plugin folder.
 
+Machine-specific notes (install path, Designer port and build) live in `CLAUDE.local.md`, which
+is git-ignored. Keep names, user paths and e-mail addresses out of tracked files.
+
 ## Working rules
 
 - **Bump `VERSION` in `build.py` on every change you install, and tell the user the version number.**
@@ -11,15 +14,19 @@ No bridge: everything runs from the plugin folder.
   It shows as a badge in the plugin window, in the Plugin Launcher name, in `VERSION.txt` and in
   `out.html`'s `<title>`.
 - Edit `src/` only. `dist/` is generated: `python build.py`.
-- Install: `python build.py --install "<Designer project>\plugins"`
-  (copies the 5 plugin files, byte-checks them, leaves `logos/` and `presets/` alone).
-  `led_products.csv` is a user file: installed when missing or still as last installed
-  (marker `.led_products.csv.installed` holds its sha1); a copy edited in the project is KEPT. The user must **close and
-  reopen the plugin window** from Plugins → Plugin Launcher to load a new version.
+- Install: `python build.py --install "<Designer project>\plugins"` (the test project's path is in
+  `CLAUDE.local.md`). Copies the plugin files in `FILES` (incl. `led_products.csv`, `README.txt`),
+  byte-checks them, leaves `logos/`, `presets/` and `my_led_products.csv` alone. The user must
+  **close and reopen the plugin window** from Plugins → Plugin Launcher to load a new version.
+- Release: `python build.py --zip` → `dist/gus_testpattern-<v>.zip` (plugin folder at the top) +
+  `dist/RELEASE_NOTES.md`. Pushing a tag `v<VERSION>` runs `.github/workflows/release.yml`, which
+  checks the tag against `build.py`, builds the zip and publishes a GitHub Release (pre-release
+  while the version is 0.x).
 - Test: `npm install`, `npx playwright install chromium` once, then `python tests/run_tests.py`.
   Every result's `"errs"` should be `[]`. Look at the PNGs in `tests/out/` after visual changes.
-- Designer on the dev machine is on **port 81** (IIS/W3SVC holds port 80 → 503 Microsoft-HTTPAPI).
-  Designer build r32.4.18, rev 263185 at first; a later screenshot shows r34.2.2, rev 270781.
+- Designer's API port varies by machine (80 by default; 81 or 8080 when something else holds 80).
+  The window tries `?director`, the last good address, same origin, then 80/81/8080.
+  Developed against Designer r32.4.18 and r34.2.2.
 
 ## Layout
 
@@ -31,7 +38,8 @@ src/index.src.html   plugin window. build inlines pattern.js (/*@PATTERN@*/) and
                      JSON string (/*@PYSRC@*/''); @VERSION@ is replaced everywhere.
 src/out.src.html     page a Web layer loads; state lives in the URL hash, redraws on hashchange
 src/designer.py      Python 2.7 helper that runs inside Designer (also shipped as __init__.py)
-src/led_products.csv LED product list (Excel-editable) shipped into the plugin folder
+src/led_products.csv built-in LED product list, shipped (users add theirs in my_led_products.csv)
+.github/workflows/release.yml   tag v<VERSION> -> build zip -> GitHub Release
 tests/mock_designer.py   fake Designer: documented API only, real Web layer field list, restricted
                      import hook, HTTP 500 + rollback on errors, size_mode eval → recursion error
 tests/e2e.mjs, e2e_led.mjs, e2e_grad.mjs   Playwright end-to-end; tests/run_tests.py runs them on fresh mocks
@@ -113,6 +121,7 @@ going back restores them (defaults if none).
   not connected. Picking one sets tile px + modules and turns module shading on; hand-editing those
   keys clears `ledProduct`. mm columns give the wall's metres in the wall note.
   Only the ROE CB3 specs were confirmed by the user; the other rows are marked "check against datasheet".
+  Users add or override rows in `my_led_products.csv` (never shipped; same name wins, ★ in the list).
 - Presets: one file per preset, `<plugin>/presets/<name>.json` = {plugin, version, name, saved,
   settings: non-default keys minus labelText/resW/resH}. The file name is the preset name.
   `list_presets / save_preset / delete_preset` in Python. Not connected → window localStorage;
@@ -152,7 +161,7 @@ dropdowns · 2.9 separate host for Web layers · 2.10 migrate old layers (window
 2.13.0 LED modules, led_products.csv, preset files.
 
 Renumbered on 2026-11-07: 2.13.0 became **0.9.13** (same code); the patch number carries on
-(0.9.14, 0.9.15 …). 0.9.14 Projector grid / LED wall mode toggle. 0.9.15 Gradient mode + 16-bit export, window layout fix. 0.9.16 no input transform in Gradient mode. 0.9.17 no grid/circles in Gradient mode. 0.9.18 LED tile colour modes, no grid/circles in LED mode. 0.9.19 searchable LED product picker. Older notes and code comments that mention 2.x refer to the old numbering.
+(0.9.14, 0.9.15 …). 0.9.14 Projector grid / LED wall mode toggle. 0.9.15 Gradient mode + 16-bit export, window layout fix. 0.9.16 no input transform in Gradient mode. 0.9.17 no grid/circles in Gradient mode. 0.9.18 LED tile colour modes, no grid/circles in LED mode. 0.9.19 searchable LED product picker. 0.9.20 release zip + workflow, my_led_products.csv. Older notes and code comments that mention 2.x refer to the old numbering.
 
 ## Known limits
 

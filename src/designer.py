@@ -13,7 +13,7 @@ quick pass on the render thread. Every function returns a JSON string.
     screens()                      project screens with resolutions
     write_chunk(path, b64, first)  write an exported PNG/TIF in pieces
     list_logos()                   image files in <plugin>/logos/
-    led_products()                 text of <plugin>/led_products.csv (parsed in the window)
+    led_products()                 text of <plugin>/led_products.csv + my_led_products.csv
     list_presets()                 every <plugin>/presets/*.json, as text
     save_preset(name, text)        write <plugin>/presets/<name>.json
     delete_preset(name)            remove it
@@ -42,7 +42,8 @@ SIZE_MODE_MATCH_MAPPING = 0      # Designer's list: 0 Match Mapping, 1 Custom (s
 PLUGIN_MODULE_NAMES = ('gus_testpattern', 'user_module_gus_testpattern')
 EXPORT_EXTS = ('.png', '.tif', '.tiff')
 IMAGE_EXTS = ('.png', '.jpg', '.jpeg', '.webp', '.svg')
-PRODUCTS_FILE = 'led_products.csv'
+PRODUCTS_FILE = 'led_products.csv'          # shipped list, replaced by every update
+MY_PRODUCTS_FILE = 'my_led_products.csv'    # the user's own rows: never shipped, never overwritten
 PRESET_DIR = 'presets'
 PRESET_MAX = 256 * 1024
 
@@ -901,11 +902,13 @@ def _need_plugin_dir():
 def _led_products_impl():
     _at(u'find plugin folder')
     os, pd = _need_plugin_dir()
-    p = os.path.join(pd, PRODUCTS_FILE)
-    if not os.path.isfile(p):
-        return _ok(text=u'', path=p, missing=True)
-    _at(u'read ' + PRODUCTS_FILE)
-    return _ok(text=_read_text(p), path=p)
+    out = {}
+    for key, name in (('text', PRODUCTS_FILE), ('myText', MY_PRODUCTS_FILE)):
+        p = os.path.join(pd, name)
+        _at(u'read ' + name)
+        out[key] = _read_text(p) if os.path.isfile(p) else u''
+    return _ok(text=out['text'], myText=out['myText'], path=os.path.join(pd, PRODUCTS_FILE),
+               myPath=os.path.join(pd, MY_PRODUCTS_FILE), missing=not out['text'])
 
 
 def _preset_file(name):
