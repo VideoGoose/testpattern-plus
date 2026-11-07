@@ -12,6 +12,15 @@ const cases = {
   rainbow_down_letters: "ledWall=1&tileW=256&tileH=128&tilesX=6&tilesY=6&tileFill=4&colLabels=0&rowLabels=1&refOrder=1&startCorner=2&tileCross=1&gridMode=0&circles=1&label=1&name=WALL",
   // ROE CB3: 160x320 px tiles, 2 x 8 modules; half tile 160x160, 2 x 4 modules
   cb3_modules: "ledWall=1&tileW=160&tileH=320&tilesX=6&tilesY=2&halfTile=2&modulesX=2&modulesY=8&modulesHalfY=4&moduleShow=3&tileFill=6&gridMode=0&circles=0&label=0&tileLabels=0&border=0&centreCross=0",
+  // tile colour modes (tile outline off so the sampled pixels are pure tile colour)
+  rb_diagonal: "ledWall=1&tileW=100&tileH=100&tilesX=6&tilesY=4&tileFill=7&tileBrightness=1&tileOutline=0&tileLabels=0&label=0",
+  rb_sequence_snake: "ledWall=1&tileW=100&tileH=100&tilesX=6&tilesY=4&tileFill=8&serpentine=1&tileBrightness=1&tileOutline=0&tileLabels=2&label=0",
+  distinct: "ledWall=1&tileW=100&tileH=100&tilesX=8&tilesY=5&tileFill=9&tileOutline=2&tileLabels=1&label=0",
+  rb_in_tile: "ledWall=1&tileW=200&tileH=100&tilesX=4&tilesY=3&tileFill=10&tileBrightness=1&tileOutline=2&tileLabels=1&label=0",
+  grey_across_shade: "ledWall=1&tileW=100&tileH=100&tilesX=6&tilesY=3&tileFill=11&tileBrightness=1&tileShade=0.5&tileOutline=0&tileLabels=0&label=0",
+  rb_across_half_range: "ledWall=1&tileW=100&tileH=100&tilesX=4&tilesY=2&tileFill=3&hueStart=120&hueRange=180&tileBrightness=1&tileSaturation=0.5&tileOutline=0&tileLabels=0&label=0",
+  // LED walls never draw the grid / circles / border, even when the URL asks for them
+  led_grid_ignored: "ledWall=1&tileW=100&tileH=100&tilesX=4&tilesY=3&tileFill=6&tileOutline=0&tileLabels=0&label=0&gridMode=1&circles=1&centreCross=1&diagonals=1&border=1",
   modules_auto_half: "ledWall=1&tileW=160&tileH=320&tilesX=2&tilesY=1&halfTile=1&modulesY=8&moduleShow=1&tileFill=6&gridMode=0&circles=0&label=0&tileLabels=0&border=0&centreCross=0",
 };
 const px = (p, pts) => p.evaluate(pts => { const c = document.getElementById("c").getContext("2d");
@@ -32,6 +41,15 @@ for (const [n, h] of Object.entries(cases)) {
     acrossTiles: await px(p, [[180, 20], [260, 20]]),                       // continues into tile 2
     halfRow: await px(p, [[20, 660], [20, 700], [20, 740], [20, 780]]),     // 4 modules, 40 px each
     seams: await px(p, [[80, 100], [30, 40], [30, 680]]) };
+  const rgb = pts => p.evaluate(pts => { const c = document.getElementById("c").getContext("2d");
+    return pts.map(([x, y]) => Array.from(c.getImageData(x, y, 1, 1).data.slice(0, 3)).join(",")); }, pts);
+  if (n === "rb_diagonal") res.rbDiagonal = await rgb([[50, 50], [150, 50], [50, 150]]);           // A1 red; B1 and A2 the same hue
+  if (n === "rb_sequence_snake") res.rbSnake = await rgb([[15, 85], [515, 85], [515, 185]]);       // seq 0, 5, 6 (snake turns)
+  if (n === "distinct") res.distinct = new Set(await rgb([...Array(8)].map((_, i) => [i * 100 + 50, 50]))).size;
+  if (n === "rb_in_tile") res.rbInTile = await rgb([[4, 12], [100, 12], [204, 12]]);              // red, cyan-ish, red again
+  if (n === "grey_across_shade") res.greyShade = await rgb([[50, 50], [550, 50], [550, 150]]);     // 0, 255, 255 darkened 50%
+  if (n === "rb_across_half_range") res.hueRange = await rgb([[50, 50], [350, 50]]);               // starts green, half saturation
+  if (n === "led_grid_ignored") res.ledGridIgnored = new Set(await rgb([[200, 150], [0, 0], [100, 150], [150, 150], [399, 299]])).size === 1;
   if (n === "modules_auto_half") res.autoHalf_px = await px(p, [[20, 20], [20, 60], [20, 100], [20, 140]]);
   await p.close();
 }
@@ -54,7 +72,9 @@ await ui.waitForFunction(() => document.querySelector('.row[data-key="ledProduct
 const shown = () => ui.evaluate(() => ({
   led: !document.querySelector('details[data-group="LED wall"]').classList.contains("hide"),
   res: !document.querySelector('details[data-group="Resolution"]').classList.contains("hide"),
-  sel: document.querySelector("#mode .sel").textContent }));
+  sel: document.querySelector("#mode .sel").textContent,
+  grid: !document.querySelector('details[data-group="Grid"]').classList.contains("hide"),
+  circles: !document.querySelector('details[data-group="Circles"]').classList.contains("hide") }));
 res.modeStart = await shown();
 await ui.click('#mode button[data-v="1"]');
 await ui.waitForTimeout(300);
@@ -67,8 +87,22 @@ res.docWidth = await ui.evaluate(() => document.documentElement.scrollWidth);
 const val = k => ui.evaluate(k => { const r = document.querySelector('.row[data-key="' + k + '"]');
   const n = r.querySelector("input[type=number]"); return n ? n.value : r.querySelector("select") ? r.querySelector("select").value : null; }, k);
 await ui.evaluate(() => document.querySelectorAll("details").forEach(d => d.open = true));
-await pick(ui, '.row[data-key="ledProduct"] select', "ROE Carbon CB3");
+// product picker has a search box: type, then Enter picks the first match
+const visible = () => ui.evaluate(() => [...document.querySelectorAll(".pick-list > div")].filter(d => d.style.display !== "none").map(d => d.textContent));
+await ui.click('.row[data-key="ledProduct"] .pick > button');
+res.search = { focused: await ui.evaluate(() => document.activeElement.className), all: (await visible()).length };
+await ui.keyboard.type("diamond");
+res.search.diamond = await visible();
+await ui.fill(".pick-search", "160x320"); await ui.dispatchEvent(".pick-search", "input");
+res.search.bySize = await visible();
+await ui.fill(".pick-search", "3.75 mm"); await ui.dispatchEvent(".pick-search", "input");
+res.search.byPitch = await visible();
+await ui.fill(".pick-search", "nothing like this"); await ui.dispatchEvent(".pick-search", "input");
+res.search.none = await visible();
+await ui.fill(".pick-search", "roe cb3"); await ui.dispatchEvent(".pick-search", "input");
+await ui.keyboard.press("Enter");
 await ui.waitForTimeout(200);
+res.search.listClosed = await ui.evaluate(() => !document.querySelector(".pick-list"));
 res.product = { tileW: await val("tileW"), tileH: await val("tileH"), modulesX: await val("modulesX"),
   modulesY: await val("modulesY"), modulesHalfY: await val("modulesHalfY"), show: await val("moduleShow"),
   urlHasProduct: /ledProduct=ROE\+Carbon\+CB3/.test(await ui.inputValue("#url")) };

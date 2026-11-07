@@ -15,7 +15,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.join(HERE, 'src')
 OUT = os.path.join(HERE, 'dist', 'gus_testpattern')
-VERSION = '0.9.17'   # 0.9.xx: bump the last number on every change you install
+VERSION = '0.9.19'   # 0.9.xx: bump the last number on every change you install
 FILES = ['index.html', 'out.html', '__init__.py', 'd3plugin.json', 'VERSION.txt']
 # The user edits this one in each project (Excel): installed only when missing, never overwritten.
 USER_FILES = ['led_products.csv']

@@ -94,6 +94,11 @@
   .pick-list div { padding: 5px 10px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .pick-list div:hover, .pick-list div.cur { background: var(--field); }
   .pick-list div.cur { color: var(--accent); }
+  .pick-list div.hi { background: var(--line); }
+  .pick-list .pick-search { position: sticky; top: -4px; display: block; width: calc(100% - 12px); margin: 0 6px 4px;
+    background: var(--field); z-index: 1; }
+  .pick-list div.none { color: var(--dim); cursor: default; }
+  .pick-list div.none:hover { background: none; }
   #ask { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: none; align-items: flex-start;
     justify-content: center; padding-top: 70px; z-index: 7; }
   #ask.show { display: flex; }
@@ -239,6 +244,13 @@
       var open = document.querySelector('.pick-list');
       if (open) { var mine = open._owner === sel; open.remove(); if (mine) return; }
       var list = document.createElement('div'); list.className = 'pick-list'; list._owner = sel;
+      // searchable pickers (data-search="1" on the <select>): type to filter, arrows + Enter to pick
+      var search = sel.dataset.search === '1' ? document.createElement('input') : null, items = [], shown = [], hi = 0;
+      if (search) {
+        search.type = 'text'; search.className = 'pick-search'; search.placeholder = 'Type to search…';
+        search.onclick = function (ev) { ev.stopPropagation(); };
+        list.appendChild(search);
+      }
       [].forEach.call(sel.options, function (o, i) {
         var d = document.createElement('div'); d.textContent = o.textContent;
         if (i === sel.selectedIndex) d.className = 'cur';
@@ -247,14 +259,47 @@
           if (sel.selectedIndex !== i) { sel.selectedIndex = i; sync(); sel.dispatchEvent(new Event('change')); }
         };
         list.appendChild(d);
+        items.push({ d: d, text: ((o.dataset.search || '') + ' ' + o.textContent).toLowerCase() });
       });
+      var none = document.createElement('div'); none.className = 'none'; none.style.display = 'none';
+      none.textContent = 'No match'; none.onclick = function (ev) { ev.stopPropagation(); };
+      list.appendChild(none);
+      function highlight(n) {
+        if (!shown.length) return;
+        hi = (n + shown.length) % shown.length;
+        shown.forEach(function (it, j) { it.d.classList.toggle('hi', j === hi); });
+        var d = shown[hi].d;
+        if (d.offsetTop < list.scrollTop + search.offsetHeight) list.scrollTop = d.offsetTop - search.offsetHeight - 4;
+        else if (d.offsetTop + d.offsetHeight > list.scrollTop + list.clientHeight) list.scrollTop = d.offsetTop + d.offsetHeight - list.clientHeight;
+      }
+      function filter() {
+        // every word typed must appear somewhere: "roe cb3", "160x320", "2.6"
+        var words = search.value.toLowerCase().replace(/×/g, 'x').split(/\s+/).filter(Boolean);
+        shown = items.filter(function (it) {
+          var ok = words.every(function (w) { return it.text.indexOf(w) >= 0; });
+          it.d.style.display = ok ? '' : 'none';
+          return ok;
+        });
+        none.style.display = shown.length ? 'none' : '';
+        var cur = shown.map(function (it) { return it.d.classList.contains('cur'); }).indexOf(true);
+        highlight(words.length || cur < 0 ? 0 : cur);
+      }
+      if (search) {
+        search.oninput = filter;
+        search.onkeydown = function (ev) {
+          if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') { ev.preventDefault(); highlight(hi + (ev.key === 'ArrowDown' ? 1 : -1)); }
+          else if (ev.key === 'Enter') { ev.preventDefault(); if (shown[hi]) shown[hi].d.click(); }
+        };
+      }
       document.body.appendChild(list);
       var r = btn.getBoundingClientRect(), lw = Math.max(r.width, 160);
       list.style.minWidth = lw + 'px';
       list.style.left = Math.max(4, Math.min(r.left, innerWidth - list.offsetWidth - 4)) + 'px';
       var below = innerHeight - r.bottom - 8;
+      // opening upwards: anchor the bottom so the list stays by the button as the search narrows it
       if (below >= Math.min(list.offsetHeight, 200)) list.style.top = (r.bottom + 2) + 'px';
-      else list.style.top = Math.max(4, r.top - list.offsetHeight - 2) + 'px';
+      else list.style.bottom = Math.max(4, innerHeight - r.top + 2) + 'px';
+      if (search) { filter(); search.focus(); }
     };
     new MutationObserver(sync).observe(sel, { childList: true, subtree: true, characterData: true, attributes: true });
     // keep the label right when code sets sel.value / selectedIndex directly
@@ -409,6 +454,7 @@
       var ps = document.createElement('select');
       addOpt(ps, '', '— custom —');
       ps.onchange = function () { applyProduct(ps.value); };
+      ps.dataset.search = '1';
       r.appendChild(ps);
       picker(ps);
       productSel = ps;
@@ -513,6 +559,13 @@
       if (SCHEMA[k][5] === 'LED wall' && k !== 'ledWall') r.classList.toggle('dim', !state.ledWall);
       if (k === 'ledWall' || k === 'gradMode') r.classList.add('hide');   // the header toggle replaces these
       if (k === 'gradSteps' || k === 'gradLabels') r.classList.toggle('dim', !(state.gradType === 1 || state.gradType === 3));
+      // tile colour options that do nothing for the chosen colour mode
+      var f = state.tileFill, ab = f <= 2 || f === 6 || (f === 5 && !state.portTiles);
+      if (k === 'tileColourA') r.classList.toggle('dim', !ab);
+      if (k === 'tileColourB') r.classList.toggle('dim', !(ab && f !== 6));
+      if (k === 'tileBrightness' || k === 'tileSaturation') r.classList.toggle('dim', ab || (k === 'tileSaturation' && f === 11));
+      if (k === 'hueStart') r.classList.toggle('dim', ab || f === 11);
+      if (k === 'hueRange') r.classList.toggle('dim', !(f === 3 || f === 4 || f === 7 || f === 8 || f === 10));
     });
     // mode: each mode shows its own section; Resolution and the preview size don't apply to LED walls
     var m = mode();
@@ -520,7 +573,7 @@
     document.querySelectorAll('details[data-group]').forEach(function (d) {
       var g = d.dataset.group;
       d.classList.toggle('hide', (g === 'LED wall' && m !== 1) || (g === 'Gradient' && m !== 2) || (g === 'Resolution' && m === 1) ||
-                                 (m === 2 && (g === 'Input transform' || g === 'Grid' || g === 'Circles')));
+                                 (m !== 0 && (g === 'Grid' || g === 'Circles')) || (m === 2 && g === 'Input transform'));
     });
     $('size').classList.toggle('off', m === 1);
     $('size').title = m === 1 ? 'LED wall mode: the wall size sets the output size'
@@ -662,6 +715,9 @@
       addOpt(productSel, '', '— custom —');
       products.forEach(function (p) {
         addOpt(productSel, p.name, p.name + ' · ' + p.tileW + '×' + p.tileH + ' px · ' + p.modulesX + '×' + p.modulesY + ' modules');
+        // also searchable by pitch, size in px / mm (with x) and the notes column
+        productSel.options[productSel.options.length - 1].dataset.search =
+          [p.tileW + 'x' + p.tileH, p.pitch ? p.pitch + 'mm ' + p.pitch + ' mm' : '', p.wmm ? p.wmm + 'x' + p.hmm : '', p.notes].join(' ');
       });
       inputs.ledProduct.set(state.ledProduct);
       diag('✓ ' + products.length + ' LED products from led_products.csv');

@@ -79,7 +79,8 @@ line plus drawing code in `render()`.
 
 ## Plugin window rules (Designer's embedded browser)
 
-- No native `<select>`: use `picker()`. No `prompt/confirm/alert`: use `ask()` and `toast()`.
+- No native `<select>`: use `picker()`. `data-search="1"` on the select adds a type-to-filter box
+  (every word must match option text or the option's `data-search`; arrows + Enter). Used for LED products. No `prompt/confirm/alert`: use `ask()` and `toast()`.
 - Body is a flex column (header / main / footer). The plugin window can't be resized and the
   header wraps to two rows at ~900 px, so never size `main` with calc(100% - Npx) (0.9.15 fix).
 - Don't counter-zoom in page CSS (v2.9.0 tried; dpr went *up* to 2.25 while the page shrank).
@@ -129,6 +130,15 @@ no CompressionStream → 8-bit export). The input transform, grid lines, circles
 ignored in Gradient mode and their sections hidden (0.9.16, 0.9.17). Entering Gradient mode turns off grid, circles, centre
 cross, diagonals, label and border; back to Projector grid restores them.
 
+## LED tile colours (0.9.18)
+
+`tileFill` 0-6 keep their 2.12 meaning (layer URLs, presets); added 7 rainbow diagonal, 8 rainbow
+in data order (follows seq / snake), 9 distinct colours (golden-angle hue per seq), 10 rainbow
+inside each tile (shows rotated/mirrored tiles), 11 grey ramp across. `tileBrightness` (default
+0.45 → 0.8; 1 = full hue), `tileSaturation`, `hueStart`, `hueRange`, `tileShade` (black checker
+over any mode). Rows that don't apply to the chosen mode are dimmed. LED walls, like gradients,
+never draw grid lines, circles, centre cross, diagonals or border; their sections are hidden.
+
 Ideas offered, not built: half-tile column left/right; port limits by pixel count; power
 circuit groups; 1-px/seam/gradient checks; missing tiles for irregular walls; tile-map CSV export.
 
@@ -142,7 +152,7 @@ dropdowns · 2.9 separate host for Web layers · 2.10 migrate old layers (window
 2.13.0 LED modules, led_products.csv, preset files.
 
 Renumbered on 2026-11-07: 2.13.0 became **0.9.13** (same code); the patch number carries on
-(0.9.14, 0.9.15 …). 0.9.14 Projector grid / LED wall mode toggle. 0.9.15 Gradient mode + 16-bit export, window layout fix. 0.9.16 no input transform in Gradient mode. 0.9.17 no grid/circles in Gradient mode. Older notes and code comments that mention 2.x refer to the old numbering.
+(0.9.14, 0.9.15 …). 0.9.14 Projector grid / LED wall mode toggle. 0.9.15 Gradient mode + 16-bit export, window layout fix. 0.9.16 no input transform in Gradient mode. 0.9.17 no grid/circles in Gradient mode. 0.9.18 LED tile colour modes, no grid/circles in LED mode. 0.9.19 searchable LED product picker. Older notes and code comments that mention 2.x refer to the old numbering.
 
 ## Known limits
 

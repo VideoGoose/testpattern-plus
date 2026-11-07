@@ -37,11 +37,18 @@
     moduleOpacity:    ['float', 0.18, 0.02, 1, 'Module shading strength', 'LED wall'],
     moduleOutline:    ['int', 1, 1, 32, 'Module outline (px)', 'LED wall'],
     moduleOutlineColour:['colour', '#8c8c8c', 0, 0, 'Module outline colour', 'LED wall'],
-    tileFill:         ['enum', 0, 0, 6, 'Tile colours', 'LED wall',
-                       ['Checker', 'Columns', 'Rows', 'Rainbow across', 'Rainbow down', 'By port', 'Solid']],
+    // indexes 0-6 are from 2.12 and must keep their meaning (layer URLs, presets)
+    tileFill:         ['enum', 0, 0, 11, 'Tile colours', 'LED wall',
+                       ['Checker', 'Columns', 'Rows', 'Rainbow across', 'Rainbow down', 'By port', 'Solid',
+                        'Rainbow diagonal', 'Rainbow in data order', 'Distinct colours', 'Rainbow inside each tile',
+                        'Grey ramp across']],
     tileColourA:      ['colour', '#1d1d1d', 0, 0, 'Tile colour A', 'LED wall'],
     tileColourB:      ['colour', '#3a3a3a', 0, 0, 'Tile colour B', 'LED wall'],
-    tileBrightness:   ['float', 0.45, 0.05, 1, 'Rainbow / port brightness', 'LED wall'],
+    tileBrightness:   ['float', 0.8, 0.05, 1, 'Colour brightness', 'LED wall'],
+    tileSaturation:   ['float', 1, 0, 1, 'Colour saturation', 'LED wall'],
+    hueStart:         ['int', 0, 0, 359, 'Rainbow start hue (°)', 'LED wall'],
+    hueRange:         ['int', 360, 30, 360, 'Rainbow hue range (°)', 'LED wall'],
+    tileShade:        ['float', 0, 0, 0.8, 'Checker shade over colours (0 = off)', 'LED wall'],
     tileOutline:      ['int', 2, 0, 64, 'Tile outline (px, 0 = off)', 'LED wall'],
     tileOutlineColour:['colour', '#ffffff', 0, 0, 'Tile outline colour', 'LED wall'],
     tileCross:        ['bool', 0, 0, 1, 'Tile diagonals', 'LED wall'],
@@ -251,20 +258,32 @@
     return { tiles: tiles, nx: nx, ny: ny };
   }
 
-  function hsl(hue, s) { return 'hsl(' + Math.round(hue) + ',100%,' + Math.round(s.tileBrightness * 50) + '%)'; }
+  // Brightness 1 = full-strength hue (50% lightness); saturation 0 = grey.
+  function hsl(hue, s) {
+    hue = ((hue % 360) + 360) % 360;
+    return 'hsl(' + hue.toFixed(1) + ',' + Math.round(s.tileSaturation * 100) + '%,' + Math.round(s.tileBrightness * 50) + '%)';
+  }
+  // f (0..1) along the rainbow -> hue, honouring start hue and range
+  function rainbow(f, s) { return hsl(s.hueStart + s.hueRange * f, s); }
 
   function tileColour(s, t, W) {
-    var A = s.tileColourA, B = s.tileColourB;
+    var A = s.tileColourA, B = s.tileColourB, n = W.tiles.length;
     switch (s.tileFill) {
       case 0: return (t.col + t.row) % 2 ? B : A;
       case 1: return t.col % 2 ? B : A;
       case 2: return t.row % 2 ? B : A;
-      case 3: return hsl(360 * t.col / W.nx, s);
-      case 4: return hsl(360 * t.row / W.ny, s);
+      case 3: return rainbow(t.col / W.nx, s);
+      case 4: return rainbow(t.row / W.ny, s);
       case 5:
         if (t.port < 0) return (t.col + t.row) % 2 ? B : A;
-        var nP = Math.ceil(W.tiles.length / s.portTiles);
-        return hsl((360 * t.port / Math.max(nP, 1) + (t.port % 2) * 180 / Math.max(nP, 1)) % 360, s);
+        var nP = Math.ceil(n / s.portTiles);
+        return hsl(s.hueStart + (360 * t.port / Math.max(nP, 1) + (t.port % 2) * 180 / Math.max(nP, 1)) % 360, s);
+      case 7: return rainbow((t.col + t.row) / Math.max(1, W.nx + W.ny - 1), s);
+      case 8: return rainbow(t.seq / n, s);
+      case 9: return hsl(s.hueStart + t.seq * 137.508, s);      // golden angle: neighbours never look alike
+      case 11:
+        var v = Math.round(255 * s.tileBrightness * (W.nx > 1 ? t.col / (W.nx - 1) : 1));
+        return 'rgb(' + v + ',' + v + ',' + v + ')';
       default: return A;
     }
   }
@@ -297,7 +316,21 @@
   function drawWall(ctx, s, opts, phase) {
     var W = wallTiles(s), T = W.tiles, i, t, font = opts.font || 'Helvetica, Arial, sans-serif';
     if (phase === 'fill') {
-      for (i = 0; i < T.length; i++) { t = T[i]; ctx.fillStyle = tileColour(s, t, W); ctx.fillRect(t.x, t.y, t.w, t.h); }
+      for (i = 0; i < T.length; i++) {
+        t = T[i];
+        if (s.tileFill === 10) {
+          // full rainbow across every tile: a rotated or mirrored tile stands out at once
+          var g = ctx.createLinearGradient(t.x, 0, t.x + t.w, 0);
+          for (var st = 0; st <= 12; st++) g.addColorStop(st / 12, rainbow(st / 12, s));
+          ctx.fillStyle = g;
+        } else ctx.fillStyle = tileColour(s, t, W);
+        ctx.fillRect(t.x, t.y, t.w, t.h);
+      }
+      // darken every other tile so same-coloured neighbours stay apart
+      if (s.tileShade > 0) {
+        ctx.fillStyle = 'rgba(0,0,0,' + s.tileShade + ')';
+        for (i = 0; i < T.length; i++) { t = T[i]; if ((t.col + t.row) % 2) ctx.fillRect(t.x, t.y, t.w, t.h); }
+      }
       // every other module, checkered across the whole wall, tinted over the tile colour
       if (s.moduleShow === 1 || s.moduleShow === 3) {
         ctx.globalAlpha = s.moduleOpacity;
@@ -514,8 +547,9 @@
     ctx.fillStyle = s.bgColour;
     ctx.fillRect(0, 0, w, h);
     var led = s.ledWall && !s.gradMode;                 // gradient mode wins over LED wall
-    // gradients carry no grid furniture, whatever the URL says (s is our own sanitised copy)
-    if (s.gradMode) { s.gridMode = 0; s.diagonals = 0; s.centreCross = 0; s.circles = 0; s.border = 0; }
+    // gradients carry no grid furniture, whatever the URL says (s is our own sanitised copy);
+    // nor do LED walls: they have tile outlines instead
+    if (s.gradMode || led) { s.gridMode = 0; s.diagonals = 0; s.centreCross = 0; s.circles = 0; s.border = 0; }
     if (s.gradMode) drawGradient(ctx, w, h, s);
     if (led) drawWall(ctx, s, opts, 'fill');
 
