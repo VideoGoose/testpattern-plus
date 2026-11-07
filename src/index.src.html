@@ -6,6 +6,11 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
+<!-- Designer plugin window: opening size, smallest size, and let the user resize it -->
+<meta name="disguise-plugin-window-size" content="1280,860">
+<meta name="disguise-plugin-window-min-size" content="720,520">
+<meta name="disguise-plugin-window-resizable" content="true">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,@ICON_B64@">
 <title>Test Pattern+ v@VERSION@</title>
 <style>
   :root {
@@ -24,6 +29,7 @@
   header { border-bottom: 1px solid var(--line); }
   #footer { border-top: 1px solid var(--line); }
   .title { font-weight: 700; letter-spacing: .02em; margin-right: 4px; }
+  .logo { width: 22px; height: 22px; flex: none; margin-right: -2px; }
   .pill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; border-radius: 99px;
     border: 1px solid var(--line); color: var(--dim); white-space: nowrap; }
   .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--dim); }
@@ -125,7 +131,7 @@
 </head>
 <body>
 <header>
-  <span class="title">Test Pattern+</span><span id="ver" class="ver" title="Plugin version">v@VERSION@</span>
+  <img class="logo" alt="" src="data:image/svg+xml;base64,@ICON_B64@"><span class="title">Test Pattern+</span><span id="ver" class="ver" title="Plugin version">v@VERSION@</span>
   <span id="mode" class="seg" title="Pattern mode">
     <button type="button" data-v="0" title="Pixel grid, circles and label for projectors / any canvas">Projector grid</button>
     <button type="button" data-v="1" title="LED wall: tiles, modules, labels and data paths">LED wall</button>

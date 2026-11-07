@@ -82,6 +82,8 @@ res.modeLed = await shown();
 res.note = await ui.textContent("#wallNote");
 res.urlHas = /ledWall=1/.test(await ui.inputValue("#url"));
 res.docWidth = await ui.evaluate(() => document.documentElement.scrollWidth);
+// Designer's Plugin Launcher loads <plugin>/icon.svg
+{ const r = await fetch(base + "icon.svg"); res.launcherIcon = [r.status, r.headers.get("content-type"), (await r.text()).includes("<svg")]; }
 
 // LED product from led_products.csv fills tile size + modules and turns modules on
 const val = k => ui.evaluate(k => { const r = document.querySelector('.row[data-key="' + k + '"]');

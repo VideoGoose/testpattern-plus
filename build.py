@@ -7,6 +7,8 @@
     python build.py --zip                       # build + dist/testpattern-plus-<version>.zip and
                                                 # dist/RELEASE_NOTES.md (used by the GitHub release)
 """
+import base64
+import io
 import filecmp
 import json
 import os
@@ -19,10 +21,11 @@ SRC = os.path.join(HERE, 'src')
 PLUGIN = 'testpattern-plus'     # plugins/<PLUGIN>/ ; the window tells the helper which folder it is in
 ZIP_NAME = PLUGIN               # release download: testpattern-plus-<version>.zip, PLUGIN folder inside
 OUT = os.path.join(HERE, 'dist', PLUGIN)
-VERSION = '0.9.21'   # 0.9.xx: bump the last number on every change you install
+VERSION = '0.9.23'   # 0.9.xx: bump the last number on every change you install
 # replaced on every install / update. The user's own files (logos/, presets/,
 # my_led_products.csv) are never part of a build, so an update can't overwrite them.
-FILES = ['index.html', 'out.html', '__init__.py', 'd3plugin.json', 'VERSION.txt', 'led_products.csv', 'README.txt']
+FILES = ['index.html', 'out.html', '__init__.py', 'd3plugin.json', 'VERSION.txt', 'led_products.csv', 'README.txt',
+         'icon.svg']
 OLD_FILES = ['.led_products.csv.installed']     # left by 0.9.13-0.9.19 installs
 
 PLUGIN_README = """Test Pattern+ v{v} for disguise Designer
@@ -62,8 +65,11 @@ def build():
     pattern = read('pattern.js')
     py = read('designer.py').replace('@VERSION@', VERSION)
     assert '</script' not in pattern.lower() and '</script' not in py.lower()
+    with open(os.path.join(HERE, 'assets', 'icon.svg'), 'rb') as f:
+        icon = base64.b64encode(f.read()).decode('ascii')     # header logo + favicon, inlined
     index = read('index.src.html').replace('@VERSION@', VERSION).replace('/*@PATTERN@*/', pattern) \
-                                  .replace("/*@PYSRC@*/''", json.dumps(py))
+                                  .replace("/*@PYSRC@*/''", json.dumps(py)).replace('@ICON_B64@', icon)
+    assert '@ICON_B64@' not in index
     out = read('out.src.html').replace('/*@PATTERN@*/', pattern).replace('@VERSION@', VERSION)
     assert '@PATTERN@' not in index + out and '@PYSRC@' not in index
     assert '@VERSION@' not in index + out + py
@@ -75,6 +81,8 @@ def build():
         'VERSION.txt': VERSION + '\n',
         'led_products.csv': read('led_products.csv'),
         'README.txt': PLUGIN_README.format(v=VERSION),
+        # Designer's Plugin Launcher loads <plugin url>/icon.svg and draws it at 24 x 24 px
+        'icon.svg': io.open(os.path.join(HERE, 'assets', 'launcher-icon.svg'), encoding='utf-8').read(),
         'logos/put-logo-images-here.txt': 'PNG, JPEG, WebP or SVG files in this folder show up in the Logos dropdowns.\n',
         'presets/put-preset-files-here.txt': (
             'Save preset in the plugin window writes <name>.json here.\n'

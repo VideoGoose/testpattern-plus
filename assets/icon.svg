@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <title>Test Pattern+</title>
+  <defs>
+    <clipPath id="tile"><rect x="8" y="8" width="240" height="240" rx="44"/></clipPath>
+  </defs>
+  <g clip-path="url(#tile)">
+    <rect x="0" y="0" width="256" height="256" fill="#15171a"/>
+    <!-- colour bars across the top -->
+    <g>
+      <rect x="0"   y="0" width="37" height="112" fill="#e8e8e8"/>
+      <rect x="37"  y="0" width="37" height="112" fill="#e8e800"/>
+      <rect x="74"  y="0" width="36" height="112" fill="#00e8e8"/>
+      <rect x="110" y="0" width="36" height="112" fill="#00e800"/>
+      <rect x="146" y="0" width="36" height="112" fill="#e800e8"/>
+      <rect x="182" y="0" width="37" height="112" fill="#e80000"/>
+      <rect x="219" y="0" width="37" height="112" fill="#0000e8"/>
+    </g>
+    <!-- greyscale steps -->
+    <g>
+      <rect x="0"   y="112" width="43" height="22" fill="#000000"/>
+      <rect x="43"  y="112" width="42" height="22" fill="#333333"/>
+      <rect x="85"  y="112" width="43" height="22" fill="#666666"/>
+      <rect x="128" y="112" width="43" height="22" fill="#999999"/>
+      <rect x="171" y="112" width="42" height="22" fill="#cccccc"/>
+      <rect x="213" y="112" width="43" height="22" fill="#ffffff"/>
+    </g>
+    <!-- grid on the lower half -->
+    <g stroke="#3a3f46" stroke-width="3">
+      <path d="M0 166H256M0 198H256M0 230H256M32 134V256M64 134V256M96 134V256M128 134V256M160 134V256M192 134V256M224 134V256"/>
+    </g>
+  </g>
+  <!-- registration circle + cross over the whole tile -->
+  <g fill="none" stroke="#ffffff" stroke-width="8">
+    <circle cx="128" cy="134" r="78"/>
+  </g>
+  <g fill="#ffffff">
+    <rect x="124" y="70" width="8" height="128"/>
+    <rect x="64" y="130" width="128" height="8"/>
+  </g>
+  <!-- the plus -->
+  <circle cx="200" cy="200" r="40" fill="#f2b33d" stroke="#15171a" stroke-width="8"/>
+  <path d="M200 180V220M180 200H220" stroke="#15171a" stroke-width="11" stroke-linecap="round"/>
+</svg>

@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <title>Test Pattern+</title>
+  <!-- simplified for Designer's Plugin Launcher, which draws plugin icons at 24 x 24 px -->
+  <defs>
+    <clipPath id="tile"><rect x="2" y="2" width="60" height="60" rx="13"/></clipPath>
+  </defs>
+  <g clip-path="url(#tile)">
+    <rect x="0" y="0" width="64" height="64" fill="#15171a"/>
+    <rect x="0"  y="0" width="13" height="36" fill="#e8e8e8"/>
+    <rect x="13" y="0" width="13" height="36" fill="#e8e800"/>
+    <rect x="26" y="0" width="12" height="36" fill="#00e8e8"/>
+    <rect x="38" y="0" width="13" height="36" fill="#e800e8"/>
+    <rect x="51" y="0" width="13" height="36" fill="#0000e8"/>
+  </g>
+  <circle cx="32" cy="34" r="19" fill="none" stroke="#ffffff" stroke-width="4.5"/>
+  <path d="M32 18V50M16 34H48" stroke="#ffffff" stroke-width="4"/>
+  <circle cx="49" cy="49" r="13" fill="#f2b33d" stroke="#15171a" stroke-width="3"/>
+  <path d="M49 42V56M42 49H56" stroke="#15171a" stroke-width="4" stroke-linecap="round"/>
+</svg>

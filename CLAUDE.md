@@ -104,6 +104,15 @@ line plus drawing code in `render()`.
   (every word must match option text or the option's `data-search`; arrows + Enter). Used for LED products. No `prompt/confirm/alert`: use `ask()` and `toast()`.
 - Body is a flex column (header / main / footer). The plugin window can't be resized and the
   header wraps to two rows at ~900 px, so never size `main` with calc(100% - Npx) (0.9.15 fix).
+- Window size comes from meta tags in `index.src.html` (0.9.22, per developer.disguise.one/plugins/
+  configuration): `disguise-plugin-window-size` 1280,860, `-min-size` 720,520, `-resizable` true.
+  Unverified in Designer yet. The layout must still work at the minimum size.
+- Icon: `assets/icon.svg` (+ `icon-512/128/32.png` for the README). The build inlines the SVG as
+  base64 (`@ICON_B64@`) for the header logo and favicon.
+- Plugin Launcher icon: Designer's launcher (served at `http://<director>/`, js/plugin-launcher.js)
+  loads `<plugin url>/icon.svg` into a 24 x 24 px <img> over its own 50 px badge, falling back
+  to a generic icon on error. d3plugin.json has no icon field. We ship
+  `assets/launcher-icon.svg` (simplified: bars, circle, plus) as `icon.svg` (0.9.23).
 - Don't counter-zoom in page CSS (v2.9.0 tried; dpr went *up* to 2.25 while the page shrank).
 - The connection panel (click the status pill) logs every step with JSON, plus Retry, Copy log,
   Probe. Ask the user for that log when something fails in Designer.
@@ -174,7 +183,7 @@ dropdowns · 2.9 separate host for Web layers · 2.10 migrate old layers (window
 2.13.0 LED modules, led_products.csv, preset files.
 
 Renumbered on 2026-11-07: 2.13.0 became **0.9.13** (same code); the patch number carries on
-(0.9.14, 0.9.15 …). 0.9.14 Projector grid / LED wall mode toggle. 0.9.15 Gradient mode + 16-bit export, window layout fix. 0.9.16 no input transform in Gradient mode. 0.9.17 no grid/circles in Gradient mode. 0.9.18 LED tile colour modes, no grid/circles in LED mode. 0.9.19 searchable LED product picker. 0.9.20 release zip + workflow, my_led_products.csv. 0.9.21 plugin folder renamed gus_testpattern → testpattern-plus (no carry-over). Older notes and code comments that mention 2.x refer to the old numbering.
+(0.9.14, 0.9.15 …). 0.9.14 Projector grid / LED wall mode toggle. 0.9.15 Gradient mode + 16-bit export, window layout fix. 0.9.16 no input transform in Gradient mode. 0.9.17 no grid/circles in Gradient mode. 0.9.18 LED tile colour modes, no grid/circles in LED mode. 0.9.19 searchable LED product picker. 0.9.20 release zip + workflow, my_led_products.csv. 0.9.21 plugin folder renamed gus_testpattern → testpattern-plus (no carry-over). 0.9.22 icon, resizable window, README. 0.9.23 Plugin Launcher icon (icon.svg). Older notes and code comments that mention 2.x refer to the old numbering.
 
 ## Known limits
 
