@@ -15,6 +15,10 @@
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--text);
     font: 12px/1.35 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  /* column layout: header and footer take what they need (they wrap in narrow plugin windows),
+     main gets the rest. Designer's plugin window can't be resized, so nothing may assume heights. */
+  body { display: flex; flex-direction: column; }
+  header, #footer { flex: none; }
   header, #footer { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 8px 10px;
     background: var(--panel); }
   header { border-bottom: 1px solid var(--line); }
@@ -38,7 +42,7 @@
   .ver { font: 600 11px/1 ui-monospace, Menlo, Consolas, monospace; color: #111; background: var(--accent);
     padding: 3px 6px; border-radius: 4px; margin-right: 4px; }
   .ver.stale { background: var(--warn); color: #fff; }
-  main { display: grid; grid-template-columns: minmax(280px, 360px) minmax(0, 1fr); height: calc(100% - 90px); }
+  main { display: grid; grid-template-columns: minmax(280px, 360px) minmax(0, 1fr); flex: 1 1 auto; min-height: 0; }
   #controls { overflow-y: auto; border-right: 1px solid var(--line); padding-bottom: 24px; }
   details { border-bottom: 1px solid var(--line); }
   summary { cursor: pointer; padding: 8px 10px; font-weight: 600; color: var(--dim);
@@ -64,6 +68,9 @@
   #preview { position: absolute; inset: 14px; margin: auto; width: auto; height: auto;
     max-width: calc(100% - 28px); max-height: calc(100% - 28px); box-shadow: 0 0 0 1px var(--line); image-rendering: pixelated; }
   #size input { width: 66px; }
+  #size.off { opacity: .4; }
+  #mode button { padding: 4px 12px; font-weight: 600; }
+  details.hide, .row.hide { display: none; }
   #url { flex: 1; min-width: 200px; font-family: ui-monospace, Menlo, Consolas, monospace; }
   #toast { position: fixed; right: 12px; bottom: 56px; background: var(--panel); border: 1px solid var(--line);
     padding: 8px 12px; border-radius: 6px; max-width: 460px; opacity: 0; transition: opacity .2s;
@@ -106,7 +113,7 @@
     max-height: 220px; overflow: auto; white-space: pre-wrap; word-break: break-all;
     font: 11px/1.4 ui-monospace, Menlo, Consolas, monospace; user-select: text; }
   @media (max-width: 760px) {
-    main { grid-template-columns: minmax(0, 1fr); grid-template-rows: 45% 55%; height: auto; min-height: calc(100% - 90px); }
+    main { grid-template-columns: minmax(0, 1fr); grid-template-rows: 45% 55%; }
     #controls { border-right: 0; border-bottom: 1px solid var(--line); order: 2; }
   }
 </style>
@@ -114,6 +121,11 @@
 <body>
 <header>
   <span class="title">Test Pattern+</span><span id="ver" class="ver" title="Plugin version">v@VERSION@</span>
+  <span id="mode" class="seg" title="Pattern mode">
+    <button type="button" data-v="0" title="Pixel grid, circles and label for projectors / any canvas">Projector grid</button>
+    <button type="button" data-v="1" title="LED wall: tiles, modules, labels and data paths">LED wall</button>
+    <button type="button" data-v="2" title="Greyscale and rainbow ramps and steps, 8- or 10-bit">Gradient</button>
+  </span>
   <select id="target" title="Web layer this window drives"></select>
   <button id="refresh" title="Re-read Web layers on the current track">↻</button>
   <button id="newLayer" class="primary">New Web layer</button>
@@ -363,7 +375,7 @@
     order.forEach(function (g, gi) {
       var d = document.createElement('details');
       d.open = gi < 3 || g === 'Input transform';
-      if (g === 'LED wall') d.dataset.group = 'led';
+      d.dataset.group = g;
       d.innerHTML = '<summary>' + g + '</summary>';
       groups[g].forEach(function (k) { d.appendChild(row(k)); });
       if (g === 'LED wall') {
@@ -372,6 +384,10 @@
         var pn = document.createElement('div'); pn.className = 'note'; pn.id = 'productNote';
         pn.textContent = 'Products come from led_products.csv in this plugin\'s folder: edit it in Excel, save as CSV, then press ↻.';
         d.appendChild(pn);
+      }
+      if (g === 'Gradient') {
+        var gn = document.createElement('div'); gn.className = 'note'; gn.id = 'gradNote';
+        d.appendChild(gn);
       }
       if (g === 'Logos') {
         var n = document.createElement('div'); n.className = 'note';
@@ -495,15 +511,63 @@
     document.querySelectorAll('.row[data-key]').forEach(function (r) {
       var k = r.dataset.key;
       if (SCHEMA[k][5] === 'LED wall' && k !== 'ledWall') r.classList.toggle('dim', !state.ledWall);
+      if (k === 'ledWall' || k === 'gradMode') r.classList.add('hide');   // the header toggle replaces these
+      if (k === 'gradSteps' || k === 'gradLabels') r.classList.toggle('dim', !(state.gradType === 1 || state.gradType === 3));
     });
+    // mode: each mode shows its own section; Resolution and the preview size don't apply to LED walls
+    var m = mode();
+    [].forEach.call($('mode').children, function (b) { b.classList.toggle('sel', Number(b.dataset.v) === m); });
+    document.querySelectorAll('details[data-group]').forEach(function (d) {
+      var g = d.dataset.group;
+      d.classList.toggle('hide', (g === 'LED wall' && m !== 1) || (g === 'Gradient' && m !== 2) || (g === 'Resolution' && m === 1) ||
+                                 (m === 2 && (g === 'Input transform' || g === 'Grid' || g === 'Circles')));
+    });
+    $('size').classList.toggle('off', m === 1);
+    $('size').title = m === 1 ? 'LED wall mode: the wall size sets the output size'
+                              : 'Preview and export size (a forced Resolution overrides it)';
+    var gn = $('gradNote');
+    if (gn) gn.textContent = state.gradBits
+      ? '10-bit: the preview and Web layers are 8-bit, so they show the top 8 bits of each value. ' +
+        'Save PNG / Save TIF write 16-bit files holding the exact 10-bit values: play one of those ' +
+        'through a 10-bit output chain for a true 10-bit test.'
+      : '8-bit: every code value 0–255 is drawn exactly (no dithering), in the preview, exports and Web layers.';
+  }
+
+  function mode() { return state.gradMode ? 2 : state.ledWall ? 1 : 0; }
+
+  // Grid furniture each mode starts with. Leaving projector grid remembers its settings and
+  // turns them off (LED wall keeps the label and border; gradients clear those too); coming
+  // back puts them back (defaults if there's nothing remembered).
+  var FURNITURE = ['gridMode', 'circles', 'centreCross', 'diagonals', 'label', 'border'], LED_KEEPS = { label: 1, border: 1 };
+  function setMode(m) {
+    var was = mode();
+    if (m === was) return;
+    var p = { ledWall: m === 1 ? 1 : 0, gradMode: m === 2 ? 1 : 0 };
+    if (m === 0) {
+      var keep = {}; try { keep = JSON.parse(store.get('tp.projFurniture') || '{}'); } catch (e) {}
+      FURNITURE.forEach(function (k) { p[k] = k in keep ? keep[k] : D[k]; });
+    } else {
+      if (was === 0) {
+        var save = {}; FURNITURE.forEach(function (k) { save[k] = state[k]; });
+        store.set('tp.projFurniture', JSON.stringify(save));
+      }
+      FURNITURE.forEach(function (k) {
+        p[k] = m === 2 || !LED_KEEPS[k] ? 0 : was === 0 ? state[k] : D[k];
+      });
+    }
+    setMany(p);
+    // open the sections that matter for the new mode
+    document.querySelectorAll('details[data-group]').forEach(function (d) {
+      var g = d.dataset.group;
+      if ((g === 'LED wall' && m === 1) || (g === 'Gradient' && m === 2)) d.open = true;
+      if (g === 'Grid' || g === 'Circles') d.open = m === 0;
+    });
+    $('controls').scrollTop = 0;
   }
 
   function set(k, v) { var p = {}; p[k] = v; setMany(p); }
 
   function setMany(p) {
-    // switching LED wall on: clear the pixel-grid furniture so the tiles read cleanly
-    // (each can be turned back on afterwards)
-    if (p.ledWall && !state.ledWall) { p.gridMode = 0; p.circles = 0; p.centreCross = 0; p.diagonals = 0; }
     state = GusTP.sanitise(p, state);
     // hand-editing tile size / modules away from the chosen product makes it custom
     if (state.ledProduct && !('ledProduct' in p) && products.length &&
@@ -665,15 +729,25 @@
     return btoa(s);
   }
 
+  function zlib(bytes) {
+    return new Response(new Blob([bytes]).stream().pipeThrough(new CompressionStream('deflate'))).arrayBuffer()
+      .then(function (b) { return new Uint8Array(b); });
+  }
+
   // Baseline RGB TIFF, Deflate-compressed when the browser can, else raw.
-  function tiff(canvas) {
-    var w = canvas.width, h = canvas.height;
-    var px = canvas.getContext('2d').getImageData(0, 0, w, h).data;
-    var rgb = new Uint8Array(w * h * 3);
-    for (var i = 0, j = 0; i < px.length; i += 4) { rgb[j++] = px[i]; rgb[j++] = px[i + 1]; rgb[j++] = px[i + 2]; }
+  // deep: optional Uint16Array of 16-bit RGB samples (10-bit gradients); else 8-bit from the canvas.
+  function tiff(canvas, deep) {
+    var w = canvas.width, h = canvas.height, bits = deep ? 16 : 8, rgb;
+    if (deep) {
+      rgb = new Uint8Array(deep.length * 2);
+      for (var k = 0; k < deep.length; k++) { rgb[k * 2] = deep[k] & 255; rgb[k * 2 + 1] = deep[k] >> 8; }   // little-endian ('II')
+    } else {
+      var px = canvas.getContext('2d').getImageData(0, 0, w, h).data;
+      rgb = new Uint8Array(w * h * 3);
+      for (var i = 0, j = 0; i < px.length; i += 4) { rgb[j++] = px[i]; rgb[j++] = px[i + 1]; rgb[j++] = px[i + 2]; }
+    }
     var packed = window.CompressionStream
-      ? new Response(new Blob([rgb]).stream().pipeThrough(new CompressionStream('deflate'))).arrayBuffer()
-          .then(function (b) { return { data: new Uint8Array(b), comp: 8 }; })
+      ? zlib(rgb).then(function (b) { return { data: b, comp: 8 }; })
       : Promise.resolve({ data: rgb, comp: 1 });
     return packed.then(function (p) {
       var tags = [[256, 4, 1, w], [257, 4, 1, h], [258, 3, 3, 'bps'], [259, 3, 1, p.comp], [262, 3, 1, 2],
@@ -692,11 +766,45 @@
         if (t[1] === 3 && t[2] === 1) dv.setUint16(o + 8, v, true); else dv.setUint32(o + 8, v, true);
       });
       dv.setUint32(ifd + 2 + tags.length * 12, 0, true);
-      for (var b = 0; b < 3; b++) dv.setUint16(bpsOff + b * 2, 8, true);
+      for (var b = 0; b < 3; b++) dv.setUint16(bpsOff + b * 2, bits, true);
       dv.setUint32(xresOff, 72, true); dv.setUint32(xresOff + 4, 1, true);
       dv.setUint32(yresOff, 72, true); dv.setUint32(yresOff + 4, 1, true);
       new Uint8Array(buf, dataOff).set(p.data);
       return new Uint8Array(buf);
+    });
+  }
+
+  // 16-bit RGB PNG (for 10-bit gradients): samples big-endian, filter 0 on every row.
+  var crcTable = null;
+  function crc32(bytes) {
+    if (!crcTable) {
+      crcTable = new Uint32Array(256);
+      for (var n = 0; n < 256; n++) { var c = n; for (var k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; crcTable[n] = c >>> 0; }
+    }
+    var crc = 0xffffffff;
+    for (var i = 0; i < bytes.length; i++) crc = crcTable[(crc ^ bytes[i]) & 255] ^ (crc >>> 8);
+    return (crc ^ 0xffffffff) >>> 0;
+  }
+  function png16(w, h, deep) {
+    var row = 1 + w * 6, raw = new Uint8Array(row * h);
+    for (var y = 0; y < h; y++) {
+      for (var x = 0; x < w * 3; x++) { var v = deep[y * w * 3 + x], o = y * row + 1 + x * 2; raw[o] = v >> 8; raw[o + 1] = v & 255; }
+    }
+    return zlib(raw).then(function (idat) {
+      function chunk(type, data) {
+        var out = new Uint8Array(12 + data.length), dv = new DataView(out.buffer);
+        dv.setUint32(0, data.length);
+        for (var i = 0; i < 4; i++) out[4 + i] = type.charCodeAt(i);
+        out.set(data, 8);
+        dv.setUint32(8 + data.length, crc32(out.subarray(4, 8 + data.length)));
+        return out;
+      }
+      var ihdr = new Uint8Array(13), dv = new DataView(ihdr.buffer);
+      dv.setUint32(0, w); dv.setUint32(4, h); ihdr[8] = 16; ihdr[9] = 2;      // 16-bit, truecolour
+      var parts = [new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', ihdr), chunk('IDAT', idat), chunk('IEND', new Uint8Array(0))];
+      var len = parts.reduce(function (a, p) { return a + p.length; }, 0), out = new Uint8Array(len), at = 0;
+      parts.forEach(function (p) { out.set(p, at); at += p.length; });
+      return out;
     });
   }
 
@@ -710,9 +818,13 @@
   function save(kind) {
     var s = outSize(), c = document.createElement('canvas');
     renderTo(c, s[0], s[1]);
-    var base = (state.labelText || target || 'test pattern').replace(/[^A-Za-z0-9 _\-]/g, '_').trim() || 'test pattern';
-    var name = base + '_' + s[0] + 'x' + s[1] + (kind === 'tif' ? '.tif' : '.png');
-    var bytesP = kind === 'tif' ? tiff(c)
+    // 10-bit gradients go out as 16-bit files holding the exact 10-bit code values
+    var deep = window.CompressionStream ? GusTP.deepPixels(state, c.getContext('2d').getImageData(0, 0, s[0], s[1]).data, s[0], s[1]) : null;
+    if (state.gradMode && state.gradBits && !deep) toast('This export is 8-bit (this browser has no compression for a 16-bit file).', 5000);
+    var base = (state.labelText || target || (state.gradMode ? 'gradient' : 'test pattern')).replace(/[^A-Za-z0-9 _\-]/g, '_').trim() || 'test pattern';
+    var name = base + '_' + s[0] + 'x' + s[1] + (deep ? '_10bit' : '') + (kind === 'tif' ? '.tif' : '.png');
+    var bytesP = kind === 'tif' ? tiff(c, deep)
+      : deep ? png16(s[0], s[1], deep)
       : new Promise(function (res) { c.toBlob(function (b) { b.arrayBuffer().then(function (a) { res(new Uint8Array(a)); }); }, 'image/png'); });
     status('', 'encoding ' + name + '…');
     bytesP.then(function (bytes) {
@@ -794,6 +906,7 @@
   }
 
   // ---- wiring ------------------------------------------------------------
+  [].forEach.call($('mode').children, function (b) { b.onclick = function () { setMode(Number(b.dataset.v)); }; });
   $('target').onchange = function () { adoptLayer(this.value); };
   $('refresh').onclick = function () { refreshLayers(); };
   $('live').onchange = function () { if (this.checked) queuePush(); };

@@ -56,7 +56,8 @@
     function snap(v) { var r = Math.round(v), e = Math.round(v / 8) * 8; return Math.abs(v - e) <= 2 ? e : r; }
     var vw = snap(window.innerWidth * dpr), vh = snap(window.innerHeight * dpr);
     var sz = GusTP.outputSize(state, vw, vh), w = sz[0], h = sz[1];
-    var fixedW = state.ledWall || state.resW > 0, fixedH = state.ledWall || state.resH > 0;
+    var wall = state.ledWall && !state.gradMode;
+    var fixedW = wall || state.resW > 0, fixedH = wall || state.resH > 0;
     if (canvas.width !== w) canvas.width = w;
     if (canvas.height !== h) canvas.height = h;
     canvas.style.width = (fixedW ? window.innerWidth : vw / dpr) + 'px';

@@ -20,7 +20,7 @@ import zlib
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 OUT = os.path.join(HERE, 'out')
-TESTS = ['e2e.mjs', 'e2e_led.mjs']
+TESTS = ['e2e.mjs', 'e2e_led.mjs', 'e2e_grad.mjs']
 
 
 def red_png(path, size=64):

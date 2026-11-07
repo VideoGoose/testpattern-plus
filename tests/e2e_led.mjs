@@ -51,8 +51,14 @@ await ui.setViewportSize({ width: 1400, height: 900 });
 await ui.goto(base + "index.html");
 await ui.waitForFunction(() => /connected|driving|LIVE/.test(document.getElementById("statusTxt").textContent), null, { timeout: 8000 });
 await ui.waitForFunction(() => document.querySelector('.row[data-key="ledProduct"] select').options.length > 2, null, { timeout: 8000 });
-await ui.click('.row[data-key="ledWall"] .seg button >> nth=1');
+const shown = () => ui.evaluate(() => ({
+  led: !document.querySelector('details[data-group="LED wall"]').classList.contains("hide"),
+  res: !document.querySelector('details[data-group="Resolution"]').classList.contains("hide"),
+  sel: document.querySelector("#mode .sel").textContent }));
+res.modeStart = await shown();
+await ui.click('#mode button[data-v="1"]');
 await ui.waitForTimeout(300);
+res.modeLed = await shown();
 res.note = await ui.textContent("#wallNote");
 res.urlHas = /ledWall=1/.test(await ui.inputValue("#url"));
 res.docWidth = await ui.evaluate(() => document.documentElement.scrollWidth);
@@ -101,6 +107,14 @@ res.migrated = { tileW: old.settings && old.settings.tileW, leftInWindow: await 
 await pick(ui, "#presetSel", "Old one");
 await ui.click("#presetDel"); await ui.click("#askOk"); await ui.waitForTimeout(400);
 res.deleted = await presetFile("Old one");
+
+// back to projector grid: LED section hidden, grid + circles come back
+await ui.click('#mode button[data-v="0"]');
+await ui.waitForTimeout(200);
+res.modeBack = Object.assign(await shown(), { url: (await ui.inputValue("#url")).split("#")[1],
+  grid: await ui.evaluate(() => document.querySelector('.row[data-key="gridMode"] .seg .sel').textContent),
+  circles: await ui.evaluate(() => document.querySelector('.row[data-key="circles"] .seg .sel').textContent) });
+await ui.screenshot({ path: out + "/ui_projector.png" });
 res.errs = errs;
 console.log(JSON.stringify(res, null, 1));
 await browser.close();

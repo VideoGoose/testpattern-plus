@@ -19,7 +19,7 @@ No bridge: everything runs from the plugin folder.
 - Test: `npm install`, `npx playwright install chromium` once, then `python tests/run_tests.py`.
   Every result's `"errs"` should be `[]`. Look at the PNGs in `tests/out/` after visual changes.
 - Designer on the dev machine is on **port 81** (IIS/W3SVC holds port 80 → 503 Microsoft-HTTPAPI).
-  Designer build r32.4.18, rev 263185.
+  Designer build r32.4.18, rev 263185 at first; a later screenshot shows r34.2.2, rev 270781.
 
 ## Layout
 
@@ -34,7 +34,7 @@ src/designer.py      Python 2.7 helper that runs inside Designer (also shipped a
 src/led_products.csv LED product list (Excel-editable) shipped into the plugin folder
 tests/mock_designer.py   fake Designer: documented API only, real Web layer field list, restricted
                      import hook, HTTP 500 + rollback on errors, size_mode eval → recursion error
-tests/e2e.mjs, e2e_led.mjs   Playwright end-to-end; tests/run_tests.py runs them on fresh mocks
+tests/e2e.mjs, e2e_led.mjs, e2e_grad.mjs   Playwright end-to-end; tests/run_tests.py runs them on fresh mocks
 ```
 
 Controls are generated from `SCHEMA` (`name: [type, default, min, max, label, group, options]`);
@@ -80,6 +80,8 @@ line plus drawing code in `render()`.
 ## Plugin window rules (Designer's embedded browser)
 
 - No native `<select>`: use `picker()`. No `prompt/confirm/alert`: use `ask()` and `toast()`.
+- Body is a flex column (header / main / footer). The plugin window can't be resized and the
+  header wraps to two rows at ~900 px, so never size `main` with calc(100% - Npx) (0.9.15 fix).
 - Don't counter-zoom in page CSS (v2.9.0 tried; dpr went *up* to 2.25 while the page shrank).
 - The connection panel (click the status pill) logs every step with JSON, plus Retry, Copy log,
   Probe. Ask the user for that log when something fails in Designer.
@@ -92,6 +94,11 @@ Labels: grid ref (columns and rows each numbers or letters, A1 or 1A), sequence 
 (numbers or letters, snake, start corner, start 0/1), or both. Tiles per data port + data-path
 arrows; tile pixel position; tile outline/diagonals. Turning LED mode on in the window switches
 off grid lines, circles, centre cross and diagonals.
+
+Header toggle **Projector grid | LED wall** (0.9.14) drives `ledWall`; the ledWall row is hidden.
+LED mode hides the Resolution section and dims the preview size; projector mode hides the LED
+wall section. Going to LED stores grid/circles/centre cross/diagonals (`tp.projFurniture`) and
+going back restores them (defaults if none).
 
 ## Modules, products, presets (v2.13.0)
 
@@ -110,6 +117,18 @@ off grid lines, circles, centre cross and diagonals.
   `list_presets / save_preset / delete_preset` in Python. Not connected → window localStorage;
   localStorage presets (pre-2.13) are written out as files on connect, then removed.
 
+## Gradient mode (0.9.15)
+
+Third header mode (`gradMode`, wins over `ledWall`). `gradType` greyscale ramp / steps, rainbow
+ramp / steps; `gradBits` 8 or 10; `gradDirection` L→R, R→L, T→B, B→T; `gradSteps`; step labels
+(code value + %, or hue° + RGB codes). Pixels are written with putImageData from exact code values
+(no canvas gradients, no dithering); rainbow = full-saturation HSV, ramps 0..360° exclusive.
+Canvas and Web layers are 8-bit: 10-bit shows `v >> 2`. Save PNG/TIF write 16-bit files
+(`deepPixels`: 10→16 bit by replication `(v<<6)|(v>>4)`, overlay pixels as canvas×257; null when
+no CompressionStream → 8-bit export). The input transform, grid lines, circles, centre cross, diagonals and border are
+ignored in Gradient mode and their sections hidden (0.9.16, 0.9.17). Entering Gradient mode turns off grid, circles, centre
+cross, diagonals, label and border; back to Projector grid restores them.
+
 Ideas offered, not built: half-tile column left/right; port limits by pixel count; power
 circuit groups; 1-px/seam/gradient checks; missing tiles for irregular walls; tile-map CSV export.
 
@@ -123,7 +142,7 @@ dropdowns · 2.9 separate host for Web layers · 2.10 migrate old layers (window
 2.13.0 LED modules, led_products.csv, preset files.
 
 Renumbered on 2026-11-07: 2.13.0 became **0.9.13** (same code); the patch number carries on
-(0.9.14, 0.9.15 …). Older notes and code comments that mention 2.x refer to the old numbering.
+(0.9.14, 0.9.15 …). 0.9.14 Projector grid / LED wall mode toggle. 0.9.15 Gradient mode + 16-bit export, window layout fix. 0.9.16 no input transform in Gradient mode. 0.9.17 no grid/circles in Gradient mode. Older notes and code comments that mention 2.x refer to the old numbering.
 
 ## Known limits
 

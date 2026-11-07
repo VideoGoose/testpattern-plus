@@ -61,6 +61,13 @@
     dataPathColour:   ['colour', '#ffcc00', 0, 0, 'Data path colour', 'LED wall'],
     tilePixelPos:     ['bool', 0, 0, 1, 'Show tile pixel position', 'LED wall'],
 
+    gradMode:         ['bool', 0, 0, 1, 'Gradient mode', 'Gradient'],
+    gradType:         ['enum', 0, 0, 3, 'Pattern', 'Gradient', ['Greyscale ramp', 'Greyscale steps', 'Rainbow ramp', 'Rainbow steps']],
+    gradBits:         ['enum', 0, 0, 1, 'Bit depth', 'Gradient', ['8-bit', '10-bit']],
+    gradDirection:    ['enum', 0, 0, 3, 'Direction', 'Gradient', ['Left → right', 'Right → left', 'Top → bottom', 'Bottom → top']],
+    gradSteps:        ['int', 11, 2, 1024, 'Steps', 'Gradient'],
+    gradLabels:       ['bool', 1, 0, 1, 'Show step values', 'Gradient'],
+
     gridMode:         ['enum', 1, 0, 1, 'Grid mode', 'Grid', ['Off', 'Lines']],
     gridSpacing:      ['int', 100, 2, 4096, 'Grid spacing (px)', 'Grid'],
     gridThickness:    ['int', 2, 1, 64, 'Grid line thickness (px)', 'Grid'],
@@ -397,6 +404,96 @@
     }
   }
 
+  // ---- gradients -------------------------------------------------------
+  // Fully saturated hue (0..1 round the wheel) -> [r, g, b] in 0..1.
+  function hueRgb(t) {
+    var h = (t - Math.floor(t)) * 6, i = Math.floor(h), f = h - i;
+    return [[1, 1 - f, 0, 0, f, 1][i], [f, 1, 1, 1 - f, 0, 0][i], [0, 0, f, 1, 1, 1 - f][i]];
+  }
+
+  function gradMax(s) { return s.gradBits ? 1023 : 255; }
+
+  // Which way the gradient runs over a w x h canvas.
+  function gradAxis(s, w, h) {
+    var horiz = s.gradDirection < 2;
+    return { horiz: horiz, rev: s.gradDirection === 1 || s.gradDirection === 3, L: horiz ? w : h, cross: horiz ? h : w };
+  }
+
+  // Step i of n -> position along the colour range (0..1).
+  function stepT(s, i, n) { return s.gradType === 3 ? i / n : (n > 1 ? i / (n - 1) : 0); }
+
+  // Code values (0..255 or 0..1023) for every position along the axis: [r, g, b] x L.
+  // Ramps put an exact code value on every pixel (no canvas gradient, no dithering).
+  function gradientLine(s, L) {
+    var max = gradMax(s), out = new Uint16Array(L * 3), n = s.gradSteps;
+    var rainbow = s.gradType >= 2, steps = s.gradType === 1 || s.gradType === 3;
+    for (var p = 0; p < L; p++) {
+      var t = steps ? stepT(s, Math.min(n - 1, Math.floor(p * n / L)), n)
+                    : rainbow ? p / L : (L > 1 ? p / (L - 1) : 0);
+      var c = rainbow ? hueRgb(t) : [t, t, t];
+      out[p * 3] = Math.round(c[0] * max); out[p * 3 + 1] = Math.round(c[1] * max); out[p * 3 + 2] = Math.round(c[2] * max);
+    }
+    return out;
+  }
+
+  function drawGradient(ctx, w, h, s) {
+    var A = gradAxis(s, w, h), line = gradientLine(s, A.L), sh = s.gradBits ? 2 : 0;
+    var img = ctx.createImageData(w, h), d = img.data, x, y, p, o;
+    for (y = 0; y < h; y++) {
+      for (x = 0; x < w; x++) {
+        p = A.horiz ? x : y;
+        if (A.rev) p = A.L - 1 - p;
+        o = (y * w + x) * 4;
+        d[o] = line[p * 3] >> sh; d[o + 1] = line[p * 3 + 1] >> sh; d[o + 2] = line[p * 3 + 2] >> sh; d[o + 3] = 255;
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+  }
+
+  // Code value of each step, written in the middle of the step.
+  function drawStepLabels(ctx, w, h, s, opts) {
+    if (!s.gradLabels || !(s.gradType === 1 || s.gradType === 3)) return;
+    var A = gradAxis(s, w, h), n = s.gradSteps, max = gradMax(s), font = opts.font || 'Helvetica, Arial, sans-serif';
+    var band = A.L / n;
+    if (band < 14) return;                                   // too narrow to read
+    var fs = Math.max(8, Math.round(Math.min(A.cross * 0.05, A.horiz ? band * 0.32 : band * 0.45)));
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (var i = 0; i < n; i++) {
+      var t = stepT(s, i, n), c = s.gradType === 3 ? hueRgb(t) : [t, t, t];
+      var lum = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+      var lines = s.gradType === 1 ? [String(Math.round(t * max)), Math.round(t * 100) + '%']
+                                   : [Math.round(t * 360) + '°', c.map(function (v) { return Math.round(v * max); }).join(' ')];
+      var mid = (i + 0.5) * band, pos = A.rev ? A.L - mid : mid;
+      var cx = A.horiz ? pos : w / 2, cy = A.horiz ? h / 2 : pos;
+      ctx.fillStyle = lum > 0.45 ? '#000000' : '#ffffff';
+      ctx.font = '700 ' + fs + 'px ' + font;
+      ctx.fillText(lines[0], Math.round(cx), Math.round(cy - fs * 0.55));
+      ctx.font = '500 ' + Math.max(7, Math.round(fs * 0.62)) + 'px ' + font;
+      ctx.fillText(lines[1], Math.round(cx), Math.round(cy + fs * 0.55));
+    }
+  }
+
+  // 16-bit samples (RGB, row-major) holding the exact 10-bit gradient for export, with the
+  // canvas's own pixels wherever something was drawn over the gradient (labels, grid ...).
+  // Returns null when the canvas isn't a 10-bit gradient.
+  function deepPixels(state, px, w, h) {
+    var s = sanitise(state);
+    if (!s.gradMode || !s.gradBits) return null;
+    var A = gradAxis(s, w, h), line = gradientLine(s, A.L), out = new Uint16Array(w * h * 3);
+    for (var y = 0; y < h; y++) {
+      for (var x = 0; x < w; x++) {
+        var p = A.horiz ? x : y; if (A.rev) p = A.L - 1 - p;
+        var i = y * w + x, o = i * 4, j = i * 3, v;
+        var r = line[p * 3], g = line[p * 3 + 1], b = line[p * 3 + 2];
+        if (px[o] === r >> 2 && px[o + 1] === g >> 2 && px[o + 2] === b >> 2) {
+          // 10 -> 16 bit by bit replication: full range, and >> 6 gives the 10-bit code back
+          v = r; out[j] = (v << 6) | (v >> 4); v = g; out[j + 1] = (v << 6) | (v >> 4); v = b; out[j + 2] = (v << 6) | (v >> 4);
+        } else { out[j] = px[o] * 257; out[j + 1] = px[o + 1] * 257; out[j + 2] = px[o + 2] * 257; }
+      }
+    }
+    return out;
+  }
+
   /*
    * render(ctx, w, h, state, opts)
    *   opts.channel  label fallback text
@@ -416,14 +513,19 @@
     ctx.globalAlpha = 1;
     ctx.fillStyle = s.bgColour;
     ctx.fillRect(0, 0, w, h);
-    if (s.ledWall) drawWall(ctx, s, opts, 'fill');
+    var led = s.ledWall && !s.gradMode;                 // gradient mode wins over LED wall
+    // gradients carry no grid furniture, whatever the URL says (s is our own sanitised copy)
+    if (s.gradMode) { s.gridMode = 0; s.diagonals = 0; s.centreCross = 0; s.circles = 0; s.border = 0; }
+    if (s.gradMode) drawGradient(ctx, w, h, s);
+    if (led) drawWall(ctx, s, opts, 'fill');
 
     if (s.gridMode === 1) {
       if (s.subGridSpacing > 0) drawGrid(ctx, w, h, s.subGridSpacing, s.subGridThickness, s.subGridColour, ox, oy);
       drawGrid(ctx, w, h, s.gridSpacing, s.gridThickness, s.gridColour, ox, oy);
     }
 
-    if (s.ledWall) drawWall(ctx, s, opts, 'overlay');
+    if (led) drawWall(ctx, s, opts, 'overlay');
+    if (s.gradMode) drawStepLabels(ctx, w, h, s, opts);
 
     if (s.diagonals) {
       ctx.strokeStyle = s.gridColour;
@@ -486,7 +588,7 @@
       }
     }
 
-    applyTransform(ctx, w, h, s);
+    if (!s.gradMode) applyTransform(ctx, w, h, s);     // gradients are exact code values: no input transform
     ctx.restore();
     return { w: w, h: h, state: s };
   }
@@ -494,11 +596,12 @@
   // Size to draw at: LED wall size, else forced resolution, else the given fallback.
   function outputSize(state, fw, fh) {
     var s = sanitise(state);
-    if (s.ledWall) return wallSize(s);
+    if (s.ledWall && !s.gradMode) return wallSize(s);
     return [s.resW > 0 ? s.resW : fw, s.resH > 0 ? s.resH : fh];
   }
 
   return { SCHEMA: SCHEMA, defaults: defaults, sanitise: sanitise, render: render,
            wallSize: wallSize, wallTiles: wallTiles, halfModulesY: halfModulesY, letters: letters, outputSize: outputSize,
-           buildLut: buildLut, linePositions: linePositions, band: band };
+           buildLut: buildLut, linePositions: linePositions, band: band,
+           gradientLine: gradientLine, deepPixels: deepPixels };
 });
